@@ -541,10 +541,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/reservations", async (req, res) => {
+    console.log("=== SERVER: CREATE RESERVATION ===");
+    console.log("Received body:", req.body);
+    console.log("Body type:", typeof req.body);
+    console.log("Body keys:", Object.keys(req.body));
+    console.log("timeSlot value:", req.body.timeSlot);
+    console.log("timeSlot type:", typeof req.body.timeSlot);
+    
     const result = insertReservationSchema.safeParse(req.body);
+    console.log("Validation result:", result.success);
+    
     if (!result.success) {
+      console.error("Validation errors:", JSON.stringify(result.error, null, 2));
       return res.status(400).json({ error: result.error });
     }
+    
+    console.log("Validated data:", result.data);
     
     const existingReservations = await storage.getReservationsByTable(result.data.tableId);
     if (existingReservations.length > 0) {
@@ -552,6 +564,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     const reservation = await storage.createReservation(result.data);
+    console.log("Created reservation:", reservation);
+    
     const table = await storage.getTable(reservation.tableId);
     if (table && table.status === "free") {
       const updatedTable = await storage.updateTableStatus(reservation.tableId, "reserved");

@@ -1,0 +1,29 @@
+client:536 WebSocket connection to 'wss://43342275-fa58-4023-8169-ab9411c314f1-00-3qaaanrsi1t9h.kirk.replit.dev/?token=Sh1N0vVJ0uKk' failed: 
+setupWebSocket @ client:536
+client:536 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=Sh1N0vVJ0uKk' is invalid.
+    at setupWebSocket (client:536:19)
+    at fallback (client:509:16)
+    at WebSocket.<anonymous> (client:555:7)
+chunk-RPCDYKBN.js?v=5ea3ddce:21551 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+chunk-RPCDYKBN.js?v=5ea3ddce:521 Warning: Maximum update depth exceeded. This can happen when a component calls setState inside useEffect, but useEffect either doesn't have a dependency array, or one of the dependencies changes on every render.
+    at TablesPage (https://43342275-fa58-4023-8169-ab9411c314f1-00-3qaaanrsi1t9h.kirk.replit.dev/src/pages/tables.tsx:48:24)
+    at Route (https://43342275-fa58-4023-8169-ab9411c314f1-00-3qaaanrsi1t9h.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=5ea3ddce:323:16)
+    at Switch (https://43342275-fa58-4023-8169-ab9411c314f1-00-3qaaanrsi1t9h.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=5ea3ddce:379:17)
+    at Router
+    at main
+    at div
+    at div
+    at Provider (https://43342275-fa58-4023-8169-ab9411c314f1-00-3qaaanrsi1t9h.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=5ea3ddce:38:15)
+    at TooltipProvider (https://43342275-fa58-4023-8169-ab9411c314f1-00-3qaaanrsi1t9h.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=5ea3ddce:61:5)
+    at SidebarProvider (https://43342275-fa58-4023-8169-ab9411c314f1-00-3qaaanrsi1t9h.kirk.replit.dev/src/components/ui/sidebar.tsx:59:3)
+    at Provider (https://43342275-fa58-4023-8169-ab9411c314f1-00-3qaaanrsi1t9h.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=5ea3ddce:38:15)
+    at TooltipProvider (https://43342275-fa58-4023-8169-ab9411c314f1-00-3qaaanrsi1t9h.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=5ea3ddce:61:5)
+    at QueryClientProvider (https://43342275-fa58-4023-8169-ab9411c314f1-00-3qaaanrsi1t9h.kirk.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=5ea3ddce:2805:3)
+    at App
+printWarning @ chunk-RPCDYKBN.js?v=5ea3ddce:521
+use-websocket.ts:27 [WebSocket] Connected
+use-websocket.ts:67 [WebSocket] Disconnected
+@radix-ui_react-dialog.js?v=5ea3ddce:339 Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+(anonymous) @ @radix-ui_react-dialog.js?v=5ea3ddce:339
+use-websocket.ts:27 [WebSocket] Connected
+api/reservations:1  Failed to load resource: the server responded with a status of 400 (Bad Request)

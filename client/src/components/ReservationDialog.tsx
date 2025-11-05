@@ -68,12 +68,17 @@ export default function ReservationDialog({
 
   const createReservationMutation = useMutation({
     mutationFn: async (data: any) => {
+      console.log("Mutation - sending data:", data);
       const res = await apiRequest("POST", "/api/reservations", data);
+      console.log("Mutation - response status:", res.status);
       if (!res.ok) {
         const errorData = await res.json();
+        console.error("Mutation - error response:", errorData);
         throw new Error(errorData.error || "Failed to create reservation");
       }
-      return await res.json();
+      const result = await res.json();
+      console.log("Mutation - success response:", result);
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/reservations"] });
@@ -153,6 +158,14 @@ export default function ReservationDialog({
   };
 
   const handleSubmit = () => {
+    console.log("=== RESERVATION SUBMIT DEBUG ===");
+    console.log("tableId:", tableId);
+    console.log("customerName:", customerName);
+    console.log("customerPhone:", customerPhone);
+    console.log("numberOfPeople:", numberOfPeople);
+    console.log("timeSlot raw:", timeSlot);
+    console.log("timeSlot as Date:", new Date(timeSlot));
+    
     if (!customerName.trim() || !customerPhone.trim() || !timeSlot) {
       toast({ title: "Please fill in all required fields", variant: "destructive" });
       return;
@@ -167,6 +180,9 @@ export default function ReservationDialog({
       notes: notes.trim() || null,
       status: "active",
     };
+
+    console.log("Reservation data being sent:", reservationData);
+    console.log("Reservation data JSON:", JSON.stringify(reservationData));
 
     if (editingReservation) {
       updateReservationMutation.mutate({ id: editingReservation.id, data: reservationData });
