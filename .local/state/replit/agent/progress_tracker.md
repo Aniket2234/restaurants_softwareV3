@@ -31,3 +31,5 @@
 [x] 31. Project import migration completed successfully
 [x] 32. Fixed Kitchen Display real-time updates - added WebSocket handlers for order_item_added and order_item_deleted events
 [x] 33. Kitchen Display now updates automatically when items are added or removed from orders without manual refresh
+[x] 34. Fixed Kitchen Display not updating when KOT is resent - added specific order query invalidation
+[x] 35. Kitchen Display now updates in real-time when orders are resent to kitchen without manual refresh

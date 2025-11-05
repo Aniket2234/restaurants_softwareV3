@@ -43,6 +43,9 @@ export function useWebSocket() {
               queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
               queryClient.invalidateQueries({ queryKey: ['/api/orders/active'] });
               queryClient.invalidateQueries({ queryKey: ['/api/tables'] });
+              if (message.data?.id) {
+                queryClient.invalidateQueries({ queryKey: ['/api/orders', message.data.id] });
+              }
               break;
             case 'order_item_added':
             case 'order_item_updated':
@@ -50,6 +53,9 @@ export function useWebSocket() {
               queryClient.invalidateQueries({ queryKey: ['/api/orders/active'] });
               queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
               queryClient.invalidateQueries({ queryKey: ['/api/tables'] });
+              if (message.data?.orderId) {
+                queryClient.invalidateQueries({ queryKey: ['/api/orders', message.data.orderId] });
+              }
               break;
             case 'menu_created':
             case 'menu_updated':
