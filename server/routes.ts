@@ -31,8 +31,13 @@ const checkoutSchema = z.object({
 let wss: WebSocketServer;
 
 function broadcastUpdate(type: string, data: any) {
-  if (!wss) return;
+  if (!wss) {
+    console.log('[WebSocket] No WSS instance, cannot broadcast');
+    return;
+  }
   const message = JSON.stringify({ type, data });
+  const clientCount = Array.from(wss.clients).filter(c => c.readyState === WebSocket.OPEN).length;
+  console.log(`[WebSocket] Broadcasting ${type} to ${clientCount} clients`);
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(message);
