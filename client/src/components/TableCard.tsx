@@ -1,4 +1,4 @@
-import { Clock, FileText, DollarSign } from "lucide-react";
+import { Users, Clock, FileText, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
@@ -154,6 +154,10 @@ export default function TableCard({
           </div>
           <div className="text-center w-full">
             <p className="text-xs font-semibold uppercase text-black">{config.label}</p>
+            <div className="flex items-center gap-1 justify-center mt-1 text-xs text-black">
+              <Users className="h-3 w-3" />
+              <span>{seats}</span>
+            </div>
             {(status === "preparing" || status === "ready") && orderStartTime && (
               <div className="flex items-center gap-1 justify-center mt-1 text-xs font-mono font-semibold text-black">
                 <Clock className="h-3 w-3" />
