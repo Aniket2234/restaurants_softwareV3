@@ -70,7 +70,7 @@ export default function TableCard({
   const [elapsedTime, setElapsedTime] = useState(0);
   
   useEffect(() => {
-    if (!orderStartTime || (status !== "preparing" && status !== "ready")) {
+    if (!orderStartTime || (status !== "occupied" && status !== "preparing" && status !== "ready" && status !== "served")) {
       return;
     }
 
@@ -155,7 +155,7 @@ export default function TableCard({
           </div>
           <div className="text-center w-full">
             <p className="text-xs font-semibold uppercase text-black">{config.label}</p>
-            {(status === "preparing" || status === "ready") && orderStartTime && (
+            {(status === "occupied" || status === "preparing" || status === "ready" || status === "served") && orderStartTime && (
               <div className="flex items-center gap-1 justify-center mt-1 text-xs font-mono font-semibold text-black">
                 <Clock className="h-3 w-3" />
                 <span>{formatTime(elapsedTime)}</span>

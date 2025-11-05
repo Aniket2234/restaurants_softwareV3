@@ -84,3 +84,9 @@
 [x] 84. Timer now tracks item count changes to detect when new items are added
 [x] 85. Timer pauses for both ready and served states (allReadyOrServed check)
 [x] 86. Successfully verified timer stops in history section and restarts when KOT is resent with new items
+[x] 87. Fixed Kitchen Display timer to persist paused state when navigating away and back
+[x] 88. Timer now properly stores pausedElapsed value so it doesn't continue when user switches pages
+[x] 89. Timer pauses when all items are ready/served and stays paused until new items are added
+[x] 90. Fixed Table Card timer to start when table becomes "occupied" instead of just "preparing"
+[x] 91. Table timer now shows on all active statuses: occupied, preparing, ready, and served
+[x] 92. Timer on table card now counts from when order is created (table occupied) not when cooking starts
