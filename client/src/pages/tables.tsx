@@ -206,7 +206,6 @@ export default function TablesPage() {
   const handleReservationClick = () => {
     setIsReservationMode(true);
     setSelectedTableForReservation(null);
-    setShowReservationDialog(true);
   };
 
   const handleToggleServed = async (tableId: string) => {

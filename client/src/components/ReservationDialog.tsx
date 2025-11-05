@@ -153,14 +153,6 @@ export default function ReservationDialog({
   };
 
   const handleSubmit = () => {
-    if (!tableId) {
-      toast({ title: "Please select a table", variant: "destructive" });
-      if (location !== "/tables") {
-        setLocation("/tables");
-      }
-      return;
-    }
-
     if (!customerName.trim() || !customerPhone.trim() || !timeSlot) {
       toast({ title: "Please fill in all required fields", variant: "destructive" });
       return;
@@ -189,16 +181,6 @@ export default function ReservationDialog({
     }
   };
 
-  const handleTableSelection = () => {
-    if (location !== "/tables") {
-      toast({ title: "Redirecting to tables page to select a table" });
-      setLocation("/tables");
-      onOpenChange(false);
-    } else {
-      toast({ title: "Please click on a table to make a reservation" });
-      onOpenChange(false);
-    }
-  };
 
   const selectedTable = tables.find(t => t.id === tableId);
 
@@ -223,22 +205,6 @@ export default function ReservationDialog({
         </DialogHeader>
         
         <div className="space-y-4">
-          {!selectedTable && (
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <p className="text-sm text-blue-900 dark:text-blue-100 mb-2">
-                No table selected. Please select a table first.
-              </p>
-              <Button 
-                onClick={handleTableSelection}
-                variant="outline"
-                className="w-full"
-                data-testid="button-select-table"
-              >
-                Go to Tables
-              </Button>
-            </div>
-          )}
-
           {selectedTable && (
             <>
               <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
