@@ -75,14 +75,18 @@ export default function AppHeader({
             </Button>
 
             {/* Logo/Title */}
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <button 
+              onClick={() => setLocation("/")}
+              className="flex items-center gap-2 flex-shrink-0 hover:opacity-80 transition-opacity cursor-pointer"
+              data-testid="button-logo"
+            >
               <div className="bg-red-600 text-white px-2 py-1 rounded font-bold text-sm hidden sm:block">
                 POS
               </div>
               <h1 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate">
                 {title}
               </h1>
-            </div>
+            </button>
 
             {/* Search Bar - Desktop */}
             {showSearch && (

@@ -19,3 +19,6 @@
 [x] 19. Implemented reservation button toggle - clicking again cancels reservation mode
 [x] 20. Updated table cards to show seat limit in top left corner (e.g., "2" instead of "0/2")
 [x] 21. Added max validation for reservations based on table seat capacity
+[x] 22. Updated table cards to show people icon with capacity in top left corner (without background)
+[x] 23. Set sidebar to be closed by default
+[x] 24. Made POS logo/title clickable to navigate to Dashboard
