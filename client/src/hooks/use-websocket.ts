@@ -44,7 +44,9 @@ export function useWebSocket() {
               queryClient.invalidateQueries({ queryKey: ['/api/orders/active'] });
               queryClient.invalidateQueries({ queryKey: ['/api/tables'] });
               break;
+            case 'order_item_added':
             case 'order_item_updated':
+            case 'order_item_deleted':
               queryClient.invalidateQueries({ queryKey: ['/api/orders/active'] });
               queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
               queryClient.invalidateQueries({ queryKey: ['/api/tables'] });

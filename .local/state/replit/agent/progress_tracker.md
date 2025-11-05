@@ -29,3 +29,5 @@
 [x] 29. Verified application is running and accessible
 [x] 30. Confirmed dashboard displays correctly with all statistics and charts
 [x] 31. Project import migration completed successfully
+[x] 32. Fixed Kitchen Display real-time updates - added WebSocket handlers for order_item_added and order_item_deleted events
+[x] 33. Kitchen Display now updates automatically when items are added or removed from orders without manual refresh
