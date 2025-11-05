@@ -126,6 +126,10 @@ export default function TableCard({
           config.borderColor
         )}
       >
+        <div className="absolute top-1 left-1 z-10 flex items-center gap-1 bg-gray-800 text-white rounded-full px-2 py-1 text-xs font-bold shadow-md">
+          <Users className="h-3 w-3" />
+          <span>{seats}</span>
+        </div>
         {status === "reserved" && (
           <div className="absolute top-1 right-1 z-10 bg-[#0075ff] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md border-2 border-white">
             R
@@ -151,10 +155,6 @@ export default function TableCard({
           </div>
           <div className="text-center w-full">
             <p className="text-xs font-semibold uppercase text-black">{config.label}</p>
-            <div className="flex items-center gap-1 justify-center mt-1 text-xs text-black">
-              <Users className="h-3 w-3" />
-              <span>{seats}</span>
-            </div>
             {(status === "preparing" || status === "ready") && orderStartTime && (
               <div className="flex items-center gap-1 justify-center mt-1 text-xs font-mono font-semibold text-black">
                 <Clock className="h-3 w-3" />
