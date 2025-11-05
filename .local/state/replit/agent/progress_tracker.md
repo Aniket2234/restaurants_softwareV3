@@ -16,3 +16,6 @@
 [x] 16. Confirmed all features are functional including Dashboard, POS, Tables, Menu, etc.
 [x] 17. Fixed workflow configuration to use webview output type for port 5000
 [x] 18. Application successfully running on port 5000
+[x] 19. Implemented reservation button toggle - clicking again cancels reservation mode
+[x] 20. Updated table cards to show seat limit in top left corner (e.g., "2" instead of "0/2")
+[x] 21. Added max validation for reservations based on table seat capacity
