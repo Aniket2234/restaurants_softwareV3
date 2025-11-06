@@ -51,6 +51,10 @@ export default function MenuPage() {
     queryKey: ["/api/settings/mongodb-uri"],
   });
 
+  const { data: categoriesData } = useQuery<{ categories: string[] }>({
+    queryKey: ["/api/menu/categories"],
+  });
+
   const saveMongoURIMutation = useMutation({
     mutationFn: async (uri: string) => {
       const res = await apiRequest("POST", "/api/settings/mongodb-uri", { uri });
@@ -73,6 +77,7 @@ export default function MenuPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/menu"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/menu/categories"] });
       toast({
         title: "Success",
         description: `Synced ${data.itemsImported} items from MongoDB`,
@@ -132,7 +137,10 @@ export default function MenuPage() {
     },
   });
 
-  const categories = ["All", "Burgers", "Pizza", "Fast Food", "Beverages", "Salads", "Desserts", "Pasta"];
+  const fetchedCategories = categoriesData?.categories || [];
+  const categories = fetchedCategories.length > 0 
+    ? ["All", ...fetchedCategories] 
+    : ["All", "Burgers", "Pizza", "Fast Food", "Beverages", "Salads", "Desserts", "Pasta"];
 
   const filteredItems = selectedCategory === "all" 
     ? items 
@@ -365,6 +373,7 @@ export default function MenuPage() {
                 <tr className="border-b border-border">
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Item Name</th>
                   <th className="text-center py-3 px-4 font-medium text-muted-foreground">Image</th>
+                  <th className="text-center py-3 px-4 font-medium text-muted-foreground">Type</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Category</th>
                   <th className="text-right py-3 px-4 font-medium text-muted-foreground">Price</th>
                   <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
@@ -400,6 +409,11 @@ export default function MenuPage() {
                         ) : (
                           <span className="text-muted-foreground text-sm">-</span>
                         )}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <Badge variant={item.isVeg ? "default" : "destructive"} data-testid={`badge-type-${item.id}`}>
+                          {item.isVeg ? "Veg" : "Non-Veg"}
+                        </Badge>
                       </td>
                       <td className="py-3 px-4">
                         <Badge variant="secondary">{item.category}</Badge>
