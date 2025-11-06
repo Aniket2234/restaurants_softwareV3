@@ -69,6 +69,8 @@ export default function BillingPage() {
       setServiceType(type || "dine-in");
     } else if (type === "delivery") {
       setServiceType("delivery");
+    } else if (type === "pickup") {
+      setServiceType("pickup");
     }
 
     if (orderId) {
@@ -537,9 +539,10 @@ export default function BillingPage() {
 
       if (pendingKotAction !== "none") {
         const shouldPrint = pendingKotAction === "kot-print";
-        await kotMutation.mutateAsync({ orderId: orderId!, print: shouldPrint });
         
         await billMutation.mutateAsync({ orderId: orderId!, print: shouldPrint });
+        
+        await kotMutation.mutateAsync({ orderId: orderId!, print: shouldPrint });
         
         toast({
           title: "Order completed!",
