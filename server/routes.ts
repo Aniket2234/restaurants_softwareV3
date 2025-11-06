@@ -716,6 +716,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ success: true });
   });
 
+  app.get("/api/menu/categories", async (req, res) => {
+    const categoriesJson = await storage.getSetting("menu_categories");
+    const categories = categoriesJson ? JSON.parse(categoriesJson) : [];
+    res.json({ categories });
+  });
+
   app.post("/api/menu/sync-from-mongodb", async (req, res) => {
     try {
       const mongoUri = await storage.getSetting("mongodb_uri");
@@ -724,7 +730,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { databaseName } = req.body;
-      const items = await fetchMenuItemsFromMongoDB(mongoUri, databaseName);
+      const { items, categories } = await fetchMenuItemsFromMongoDB(mongoUri, databaseName);
       
       const existingItems = await storage.getMenuItems();
       for (const existing of existingItems) {
@@ -736,6 +742,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const created = await storage.createMenuItem(item);
         createdItems.push(created);
       }
+      
+      await storage.setSetting("menu_categories", JSON.stringify(categories));
       
       broadcastUpdate("menu_synced", { count: createdItems.length });
       

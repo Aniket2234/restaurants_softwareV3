@@ -14,9 +14,10 @@ export interface MongoDBItem {
   updatedAt?: string;
   __v?: number;
   restaurantName?: string;
+  image?: string;
 }
 
-export async function fetchMenuItemsFromMongoDB(mongoUri: string, databaseName?: string): Promise<InsertMenuItem[]> {
+export async function fetchMenuItemsFromMongoDB(mongoUri: string, databaseName?: string): Promise<{ items: InsertMenuItem[], categories: string[] }> {
   let client: MongoClient | null = null;
   
   try {
@@ -35,6 +36,7 @@ export async function fetchMenuItemsFromMongoDB(mongoUri: string, databaseName?:
     const collections = await db.listCollections().toArray();
     
     const allItems: InsertMenuItem[] = [];
+    const categorySet = new Set<string>();
     
     for (const collection of collections) {
       const collectionName = collection.name;
@@ -47,15 +49,18 @@ export async function fetchMenuItemsFromMongoDB(mongoUri: string, databaseName?:
       const items = await coll.find<MongoDBItem>({}).toArray();
       
       for (const item of items) {
+        const category = item.category || collectionName;
+        categorySet.add(category);
+        
         const menuItem: InsertMenuItem = {
           name: item.name,
-          category: item.category || collectionName,
+          category: category,
           price: item.price?.toString() || "0",
           cost: (item.price ? (item.price * 0.4).toFixed(2) : "0"),
           available: item.isAvailable !== undefined ? item.isAvailable : true,
           isVeg: item.isVeg !== undefined ? item.isVeg : true,
           variants: null,
-          image: item.restaurantName || null,
+          image: item.image || null,
           description: item.description || null,
         };
         
@@ -63,7 +68,10 @@ export async function fetchMenuItemsFromMongoDB(mongoUri: string, databaseName?:
       }
     }
     
-    return allItems;
+    return {
+      items: allItems,
+      categories: Array.from(categorySet).sort()
+    };
   } catch (error) {
     console.error("Error fetching from MongoDB:", error);
     throw new Error(`Failed to fetch menu items from MongoDB: ${error instanceof Error ? error.message : String(error)}`);
