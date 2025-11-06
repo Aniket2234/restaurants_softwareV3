@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection } from 'mongodb';
+import { MongoClient, Db, Collection, Document } from 'mongodb';
 
 class MongoDBService {
   private client: MongoClient | null = null;
@@ -48,7 +48,7 @@ class MongoDBService {
     return this.db;
   }
 
-  getCollection<T = any>(name: string): Collection<T> {
+  getCollection<T extends Document = Document>(name: string): Collection<T> {
     return this.getDatabase().collection<T>(name);
   }
 

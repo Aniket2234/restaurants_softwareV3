@@ -621,4 +621,56 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+import { MongoStorage } from './mongo-storage';
+
+async function initializeStorage(): Promise<IStorage> {
+  const storage = new MongoStorage();
+  
+  const floors = await storage.getFloors();
+  if (floors.length === 0) {
+    console.log('🌱 Seeding initial data...');
+    
+    const defaultFloor = await storage.createFloor({
+      name: "Ground Floor",
+      displayOrder: 0,
+    });
+
+    const tableNumbers = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
+    const seats = [4, 6, 4, 2, 8, 4, 2, 6, 4, 4, 2, 4];
+    
+    for (let i = 0; i < tableNumbers.length; i++) {
+      await storage.createTable({
+        tableNumber: tableNumbers[i],
+        seats: seats[i],
+        status: "free",
+        floorId: defaultFloor.id,
+      });
+    }
+
+    const menuData = [
+      { name: "Chicken Burger", category: "Burgers", price: "199.00", cost: "80.00", available: true, isVeg: false, variants: ["Regular", "Large"] },
+      { name: "Veggie Pizza", category: "Pizza", price: "299.00", cost: "120.00", available: true, isVeg: true, variants: null },
+      { name: "French Fries", category: "Fast Food", price: "99.00", cost: "35.00", available: true, isVeg: true, variants: ["Small", "Medium", "Large"] },
+      { name: "Coca Cola", category: "Beverages", price: "50.00", cost: "20.00", available: true, isVeg: true, variants: null },
+      { name: "Caesar Salad", category: "Salads", price: "149.00", cost: "60.00", available: true, isVeg: true, variants: null },
+      { name: "Pasta Alfredo", category: "Pasta", price: "249.00", cost: "100.00", available: true, isVeg: true, variants: null },
+      { name: "Chocolate Cake", category: "Desserts", price: "129.00", cost: "50.00", available: true, isVeg: true, variants: null },
+      { name: "Ice Cream", category: "Desserts", price: "79.00", cost: "30.00", available: true, isVeg: true, variants: ["Vanilla", "Chocolate", "Strawberry"] },
+    ];
+
+    for (const item of menuData) {
+      await storage.createMenuItem({
+        ...item,
+        image: null,
+        description: null,
+      });
+    }
+
+    console.log('✅ Initial data seeded successfully');
+  }
+  
+  return storage;
+}
+
+export const storagePromise = initializeStorage();
+export const storage = new MongoStorage();
