@@ -530,7 +530,7 @@ export default function BillingPage() {
           }))
         : undefined;
 
-      await checkoutMutation.mutateAsync({ 
+      const checkoutResponse = await checkoutMutation.mutateAsync({ 
         orderId: orderId, 
         paymentMode: paymentMethod,
         splitPayments: splitPaymentsData,
@@ -544,10 +544,20 @@ export default function BillingPage() {
         
         await kotMutation.mutateAsync({ orderId: orderId!, print: shouldPrint });
         
+        if (shouldPrint && checkoutResponse.invoice) {
+          const pdfUrl = `/api/invoices/${checkoutResponse.invoice.id}/pdf`;
+          const link = document.createElement("a");
+          link.href = pdfUrl;
+          link.download = `${checkoutResponse.invoice.invoiceNumber}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+        
         toast({
           title: "Order completed!",
           description: shouldPrint 
-            ? "Payment confirmed, invoice generated, and KOT sent to kitchen!"
+            ? "Payment confirmed, invoice generated and downloaded, and KOT sent to kitchen!"
             : "Payment confirmed, invoice generated, and KOT sent!",
         });
       } else {

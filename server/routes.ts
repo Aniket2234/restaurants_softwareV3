@@ -15,6 +15,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { fetchMenuItemsFromMongoDB } from "./mongodbService";
+import { generateInvoicePDF } from "./utils/invoiceGenerator";
 
 const orderActionSchema = z.object({
   print: z.boolean().optional().default(false),
@@ -433,6 +434,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     broadcastUpdate("order_paid", checkedOutOrder);
     broadcastUpdate("invoice_created", invoice);
     res.json({ order: checkedOutOrder, invoice, shouldPrint: result.data.print });
+  });
+
+  app.get("/api/invoices/:id/pdf", async (req, res) => {
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      const order = await storage.getOrder(invoice.orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      const orderItems = await storage.getOrderItems(invoice.orderId);
+
+      const pdfBuffer = generateInvoicePDF({
+        invoice,
+        order,
+        orderItems,
+        restaurantName: "Restaurant POS",
+        restaurantAddress: "123 Main Street, City, State 12345",
+        restaurantPhone: "+1 (555) 123-4567",
+        restaurantGSTIN: "GSTIN1234567890",
+      });
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${invoice.invoiceNumber}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error("Error generating invoice PDF:", error);
+      res.status(500).json({ error: "Failed to generate invoice PDF" });
+    }
   });
 
   app.patch("/api/order-items/:id/status", async (req, res) => {
