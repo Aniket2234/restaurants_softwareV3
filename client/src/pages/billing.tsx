@@ -345,8 +345,8 @@ export default function BillingPage() {
       return;
     }
 
-    if (serviceType === "delivery" || serviceType === "pickup") {
-      setPendingKotAction(print ? "kot-print" : "kot");
+    if (print && (serviceType === "delivery" || serviceType === "pickup")) {
+      setPendingKotAction("kot-print");
       setShowCheckoutDialog(true);
       return;
     }
