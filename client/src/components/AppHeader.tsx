@@ -5,7 +5,8 @@ import {
   Table,
   MonitorPlay,
   UtensilsCrossed,
-  Calendar
+  Calendar,
+  FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +54,12 @@ export default function AppHeader({
       icon: UtensilsCrossed, 
       path: "/menu",
       color: "text-orange-600 dark:text-orange-400"
+    },
+    { 
+      label: "Invoices", 
+      icon: FileText, 
+      path: "/invoices",
+      color: "text-indigo-600 dark:text-indigo-400"
     },
   ];
 
