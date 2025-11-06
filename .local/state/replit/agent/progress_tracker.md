@@ -143,3 +143,11 @@
 [x] 143. Categories now update automatically when syncing from MongoDB (replaces hardcoded categories)
 [x] 144. Architect reviewed and approved all MongoDB integration improvements
 [x] 145. MONGODB ENHANCEMENTS COMPLETE: Images, categories, and veg/non-veg display working correctly
+[x] 146. Fixed route ordering - moved /api/menu/categories before /api/menu/:id to prevent 404 errors
+[x] 147. Removed duplicate categories route definition
+[x] 148. Added Sort button with dropdown menu (Name A-Z, Name Z-A, Price Low-High, Price High-Low)
+[x] 149. Implemented sorting logic that works on filtered items
+[x] 150. Categories endpoint now returns 200 status with proper data from storage
+[x] 151. Dynamic categories now replace hardcoded categories after MongoDB sync
+[x] 152. Architect reviewed and approved category fix and sort button implementation
+[x] 153. CATEGORY & SORTING FEATURES COMPLETE: MongoDB categories update correctly and menu can be sorted
