@@ -11,6 +11,7 @@ import {
   insertInventoryItemSchema,
   insertInvoiceSchema,
   insertReservationSchema,
+  insertCustomerSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { fetchMenuItemsFromMongoDB } from "./mongodbService";
@@ -705,6 +706,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
     broadcastUpdate("reservation_deleted", { id: req.params.id });
+    res.json({ success: true });
+  });
+
+  app.get("/api/customers", async (req, res) => {
+    const customers = await storage.getCustomers();
+    res.json(customers);
+  });
+
+  app.get("/api/customers/phone/:phone", async (req, res) => {
+    const customer = await storage.getCustomerByPhone(req.params.phone);
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+    res.json(customer);
+  });
+
+  app.get("/api/customers/:id", async (req, res) => {
+    const customer = await storage.getCustomer(req.params.id);
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+    res.json(customer);
+  });
+
+  app.post("/api/customers", async (req, res) => {
+    const result = insertCustomerSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    const existingCustomer = await storage.getCustomerByPhone(result.data.phone);
+    if (existingCustomer) {
+      return res.status(409).json({ error: "Customer with this phone number already exists", customer: existingCustomer });
+    }
+    const customer = await storage.createCustomer(result.data);
+    broadcastUpdate("customer_created", customer);
+    res.json(customer);
+  });
+
+  app.patch("/api/customers/:id", async (req, res) => {
+    const customer = await storage.updateCustomer(req.params.id, req.body);
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+    broadcastUpdate("customer_updated", customer);
+    res.json(customer);
+  });
+
+  app.delete("/api/customers/:id", async (req, res) => {
+    const success = await storage.deleteCustomer(req.params.id);
+    if (!success) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+    broadcastUpdate("customer_deleted", { id: req.params.id });
     res.json({ success: true });
   });
 
