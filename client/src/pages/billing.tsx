@@ -504,16 +504,22 @@ export default function BillingPage() {
     const tax = subtotal * 0.05;
     const total = subtotal + tax;
 
-    if (!currentOrderId) {
-      toast({
-        title: "No active order",
-        description: "Please send KOT or save order first before checkout",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
+      let orderId = currentOrderId;
+      
+      if (!orderId && pendingKotAction !== "none") {
+        orderId = await createOrderWithItems();
+      }
+
+      if (!orderId) {
+        toast({
+          title: "No active order",
+          description: "Please send KOT or save order first before checkout",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const splitPaymentsData = splitAmounts.length > 0 && splitAmounts.length === splitCount
         ? splitAmounts.map((amount, index) => ({
             person: index + 1,
@@ -523,24 +529,39 @@ export default function BillingPage() {
         : undefined;
 
       await checkoutMutation.mutateAsync({ 
-        orderId: currentOrderId, 
+        orderId: orderId, 
         paymentMode: paymentMethod,
         splitPayments: splitPaymentsData,
         print: false 
       });
 
-      toast({
-        title: "Order completed!",
-        description: splitPaymentsData 
-          ? `Total: ₹${total.toFixed(2)} - Split ${splitCount} ways`
-          : `Total: ₹${total.toFixed(2)} - Payment: ${paymentMethod.toUpperCase()}`,
-      });
+      if (pendingKotAction !== "none") {
+        const shouldPrint = pendingKotAction === "kot-print";
+        await kotMutation.mutateAsync({ orderId: orderId!, print: shouldPrint });
+        
+        await billMutation.mutateAsync({ orderId: orderId!, print: shouldPrint });
+        
+        toast({
+          title: "Order completed!",
+          description: shouldPrint 
+            ? "Payment confirmed, invoice generated, and KOT sent to kitchen!"
+            : "Payment confirmed, invoice generated, and KOT sent!",
+        });
+      } else {
+        toast({
+          title: "Order completed!",
+          description: splitPaymentsData 
+            ? `Total: ₹${total.toFixed(2)} - Split ${splitCount} ways`
+            : `Total: ₹${total.toFixed(2)} - Payment: ${paymentMethod.toUpperCase()}`,
+        });
+      }
 
       setOrderItems([]);
       setCurrentOrderId(null);
       setShowCheckoutDialog(false);
       setSplitAmounts([]);
       setSplitPaymentModes([]);
+      setPendingKotAction("none");
 
       if (currentTableId) {
         navigate("/tables");
