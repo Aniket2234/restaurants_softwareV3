@@ -33,12 +33,16 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { MenuItem } from "@shared/schema";
 
-type SortOption = "name-asc" | "name-desc" | "price-asc" | "price-desc";
+type SortOption = "name-asc" | "name-desc" | "price-asc" | "price-desc" | "category-asc" | "category-desc" | "cost-asc" | "cost-desc" | "type-veg" | "type-nonveg";
+type AvailabilityFilter = "all" | "available" | "unavailable";
+type TypeFilter = "all" | "veg" | "nonveg";
 
 export default function MenuPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [sortOption, setSortOption] = useState<SortOption>("name-asc");
   const [searchQuery, setSearchQuery] = useState("");
+  const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isMongoURIDialogOpen, setIsMongoURIDialogOpen] = useState(false);
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
@@ -155,7 +159,13 @@ export default function MenuPage() {
   const filteredItems = items.filter(item => {
     const matchesCategory = selectedCategory === "all" || item.category.toLowerCase() === selectedCategory;
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+    const matchesAvailability = availabilityFilter === "all" || 
+      (availabilityFilter === "available" && item.available) ||
+      (availabilityFilter === "unavailable" && !item.available);
+    const matchesType = typeFilter === "all" ||
+      (typeFilter === "veg" && item.isVeg) ||
+      (typeFilter === "nonveg" && !item.isVeg);
+    return matchesCategory && matchesSearch && matchesAvailability && matchesType;
   });
 
   const sortedItems = [...filteredItems].sort((a, b) => {
@@ -168,6 +178,18 @@ export default function MenuPage() {
         return parseFloat(a.price) - parseFloat(b.price);
       case "price-desc":
         return parseFloat(b.price) - parseFloat(a.price);
+      case "category-asc":
+        return a.category.localeCompare(b.category);
+      case "category-desc":
+        return b.category.localeCompare(a.category);
+      case "cost-asc":
+        return parseFloat(a.cost) - parseFloat(b.cost);
+      case "cost-desc":
+        return parseFloat(b.cost) - parseFloat(a.cost);
+      case "type-veg":
+        return a.isVeg === b.isVeg ? 0 : a.isVeg ? -1 : 1;
+      case "type-nonveg":
+        return a.isVeg === b.isVeg ? 0 : a.isVeg ? 1 : -1;
       default:
         return 0;
     }
@@ -270,10 +292,36 @@ export default function MenuPage() {
                   data-testid="input-search"
                 />
               </div>
-              <Button size="sm" variant="outline" data-testid="button-filter">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" data-testid="button-filter">
+                    <Filter className="h-4 w-4 mr-2" />
+                    Filter
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-2 py-1.5 text-sm font-semibold">Availability</div>
+                  <DropdownMenuItem onClick={() => setAvailabilityFilter("all")} data-testid="filter-availability-all">
+                    {availabilityFilter === "all" && "✓ "}All Items
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setAvailabilityFilter("available")} data-testid="filter-availability-available">
+                    {availabilityFilter === "available" && "✓ "}Available Only
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setAvailabilityFilter("unavailable")} data-testid="filter-availability-unavailable">
+                    {availabilityFilter === "unavailable" && "✓ "}Unavailable Only
+                  </DropdownMenuItem>
+                  <div className="px-2 py-1.5 text-sm font-semibold border-t mt-1">Type</div>
+                  <DropdownMenuItem onClick={() => setTypeFilter("all")} data-testid="filter-type-all">
+                    {typeFilter === "all" && "✓ "}All Types
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setTypeFilter("veg")} data-testid="filter-type-veg">
+                    {typeFilter === "veg" && "✓ "}Vegetarian
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setTypeFilter("nonveg")} data-testid="filter-type-nonveg">
+                    {typeFilter === "nonveg" && "✓ "}Non-Vegetarian
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <div className="flex gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -282,18 +330,41 @@ export default function MenuPage() {
                   Sort
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="px-2 py-1.5 text-sm font-semibold">Name</div>
                 <DropdownMenuItem onClick={() => setSortOption("name-asc")} data-testid="sort-name-asc">
                   Name (A-Z)
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setSortOption("name-desc")} data-testid="sort-name-desc">
                   Name (Z-A)
                 </DropdownMenuItem>
+                <div className="px-2 py-1.5 text-sm font-semibold border-t mt-1">Price</div>
                 <DropdownMenuItem onClick={() => setSortOption("price-asc")} data-testid="sort-price-asc">
                   Price (Low to High)
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setSortOption("price-desc")} data-testid="sort-price-desc">
                   Price (High to Low)
+                </DropdownMenuItem>
+                <div className="px-2 py-1.5 text-sm font-semibold border-t mt-1">Category</div>
+                <DropdownMenuItem onClick={() => setSortOption("category-asc")} data-testid="sort-category-asc">
+                  Category (A-Z)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSortOption("category-desc")} data-testid="sort-category-desc">
+                  Category (Z-A)
+                </DropdownMenuItem>
+                <div className="px-2 py-1.5 text-sm font-semibold border-t mt-1">Cost</div>
+                <DropdownMenuItem onClick={() => setSortOption("cost-asc")} data-testid="sort-cost-asc">
+                  Cost (Low to High)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSortOption("cost-desc")} data-testid="sort-cost-desc">
+                  Cost (High to Low)
+                </DropdownMenuItem>
+                <div className="px-2 py-1.5 text-sm font-semibold border-t mt-1">Type</div>
+                <DropdownMenuItem onClick={() => setSortOption("type-veg")} data-testid="sort-type-veg">
+                  Vegetarian First
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSortOption("type-nonveg")} data-testid="sort-type-nonveg">
+                  Non-Vegetarian First
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
