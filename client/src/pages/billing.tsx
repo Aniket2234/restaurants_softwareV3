@@ -7,6 +7,7 @@ import CategorySidebar from "@/components/CategorySidebar";
 import MenuItemCard from "@/components/MenuItemCard";
 import OrderCart from "@/components/OrderCart";
 import CustomerSelectionDialog from "@/components/CustomerSelectionDialog";
+import PrintableInvoice from "@/components/PrintableInvoice";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -19,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { MenuItem, Customer } from "@shared/schema";
+import type { MenuItem, Customer, Invoice, Order, OrderItem as SchemaOrderItem } from "@shared/schema";
 
 interface OrderItem {
   id: string;
@@ -52,6 +53,9 @@ export default function BillingPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
   const [pendingKotAction, setPendingKotAction] = useState<"none" | "kot" | "kot-print">("none");
+  const [printableInvoice, setPrintableInvoice] = useState<Invoice | null>(null);
+  const [printableOrder, setPrintableOrder] = useState<Order | null>(null);
+  const [printableOrderItems, setPrintableOrderItems] = useState<SchemaOrderItem[]>([]);
   const { toast} = useToast();
 
   useEffect(() => {
@@ -168,13 +172,31 @@ export default function BillingPage() {
   const billMutation = useMutation({
     mutationFn: async ({ orderId, print }: { orderId: string; print: boolean }) => {
       const res = await apiRequest("POST", `/api/orders/${orderId}/bill`, { print });
-      return await res.json();
+      const billData = await res.json();
+      
+      if (print && billData.invoice) {
+        const itemsRes = await fetch(`/api/orders/${orderId}/items`);
+        const items = await itemsRes.json();
+        
+        setPrintableInvoice(billData.invoice);
+        setPrintableOrder(billData.order);
+        setPrintableOrderItems(items);
+        
+        setTimeout(() => {
+          window.print();
+          setTimeout(() => {
+            setPrintableInvoice(null);
+            setPrintableOrder(null);
+            setPrintableOrderItems([]);
+          }, 500);
+        }, 100);
+      }
+      
+      return billData;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      if (data.shouldPrint) {
-        window.print();
-      }
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
     },
   });
 
@@ -900,6 +922,17 @@ export default function BillingPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <PrintableInvoice
+        invoice={printableInvoice}
+        order={printableOrder}
+        orderItems={printableOrderItems}
+        onPrintComplete={() => {
+          setPrintableInvoice(null);
+          setPrintableOrder(null);
+          setPrintableOrderItems([]);
+        }}
+      />
     </div>
   );
 }

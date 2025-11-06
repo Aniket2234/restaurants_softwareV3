@@ -15,6 +15,10 @@ interface InvoiceData {
 export function generateInvoicePDF(data: InvoiceData): Buffer {
   const { invoice, order, orderItems, restaurantName = "Restaurant POS", restaurantAddress = "", restaurantPhone = "", restaurantGSTIN = "" } = data;
   
+  if (!invoice || !order || !orderItems) {
+    throw new Error("Missing required data for PDF generation");
+  }
+  
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   let yPosition = 20;
@@ -61,8 +65,12 @@ export function generateInvoicePDF(data: InvoiceData): Buffer {
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   
+  const invoiceDate = invoice.createdAt instanceof Date 
+    ? invoice.createdAt 
+    : new Date(invoice.createdAt || Date.now());
+  
   doc.text(`Invoice No: ${invoice.invoiceNumber}`, 15, yPosition);
-  doc.text(`Date: ${new Date(invoice.createdAt!).toLocaleString()}`, pageWidth - 15, yPosition, { align: "right" });
+  doc.text(`Date: ${invoiceDate.toLocaleString()}`, pageWidth - 15, yPosition, { align: "right" });
   
   yPosition += 7;
 

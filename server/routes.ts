@@ -350,8 +350,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!order) {
       return res.status(404).json({ error: "Order not found" });
     }
+
+    const orderItems = await storage.getOrderItems(req.params.id);
+    
+    const subtotal = orderItems.reduce((sum, item) => 
+      sum + parseFloat(item.price) * item.quantity, 0
+    );
+    const tax = subtotal * 0.05;
+    const total = subtotal + tax;
+
+    let tableInfo = null;
+    if (order.tableId) {
+      tableInfo = await storage.getTable(order.tableId);
+    }
+
+    const invoiceCount = (await storage.getInvoices()).length;
+    const invoiceNumber = `INV-${String(invoiceCount + 1).padStart(4, '0')}`;
+
+    const invoiceItemsData = orderItems.map(item => ({
+      name: item.name,
+      quantity: item.quantity,
+      price: parseFloat(item.price),
+      isVeg: item.isVeg,
+      notes: item.notes || undefined
+    }));
+
+    const invoice = await storage.createInvoice({
+      invoiceNumber,
+      orderId: order.id,
+      tableNumber: tableInfo?.tableNumber || null,
+      floorName: tableInfo?.floorId ? (await storage.getFloor(tableInfo.floorId))?.name || null : null,
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      subtotal: subtotal.toFixed(2),
+      tax: tax.toFixed(2),
+      discount: "0",
+      total: total.toFixed(2),
+      paymentMode: order.paymentMode || "cash",
+      splitPayments: null,
+      status: "Billed",
+      items: JSON.stringify(invoiceItemsData),
+      notes: null,
+    });
+
     broadcastUpdate("order_updated", order);
-    res.json({ order, shouldPrint: result.data.print });
+    broadcastUpdate("invoice_created", invoice);
+    res.json({ order, invoice, shouldPrint: result.data.print });
   });
 
   app.post("/api/orders/:id/checkout", async (req, res) => {
