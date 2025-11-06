@@ -111,15 +111,18 @@ export default function KitchenPage() {
     });
   }, [completedOrders, completedOrderItemQueries, tables]);
 
-  const { activeOrdersList, servedOrdersList } = useMemo(() => {
+  const { activeOrdersList, readyOrdersList, completedOrdersList } = useMemo(() => {
     const active = ordersWithDetails.filter(({ items }) => 
       !items.every(item => item.status === "served")
     );
-    const served = ordersWithDetails.filter(({ items }) => 
+    const ready = ordersWithDetails.filter(({ items }) => 
       items.every(item => item.status === "served")
     );
-    const allCompleted = [...served, ...completedOrdersWithDetails];
-    return { activeOrdersList: active, servedOrdersList: allCompleted };
+    return { 
+      activeOrdersList: active, 
+      readyOrdersList: ready,
+      completedOrdersList: completedOrdersWithDetails 
+    };
   }, [ordersWithDetails, completedOrdersWithDetails]);
 
   const isLoading = orderItemQueries.some(q => q.isLoading);
@@ -223,7 +226,7 @@ export default function KitchenPage() {
               data-testid="button-toggle-history"
             >
               <History className="h-4 w-4 mr-2" />
-              {showHistory ? "Hide" : "Show"} History ({servedOrdersList.length})
+              {showHistory ? "Hide" : "Show"} History ({completedOrdersList.length})
             </Button>
             <Button
               onClick={handleMarkAllPrepared}
@@ -266,14 +269,36 @@ export default function KitchenPage() {
               )}
             </div>
 
-            {showHistory && servedOrdersList.length > 0 && (
+            {readyOrdersList.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold mb-4">Ready Orders</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {readyOrdersList.map(({ order, items, tableNumber }) => (
+                    <KitchenOrderCard
+                      key={order.id}
+                      orderId={order.id}
+                      order={order}
+                      tableNumber={tableNumber}
+                      orderTime={new Date(order.createdAt)}
+                      items={items}
+                      status="ready"
+                      onItemStatusChange={handleItemStatusChange}
+                      onComplete={completeOrderMutation.mutate}
+                      isHistory={false}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {showHistory && completedOrdersList.length > 0 && (
               <div>
                 <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <History className="h-5 w-5" />
                   Ticket History
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 opacity-60">
-                  {servedOrdersList.map(({ order, items, tableNumber }) => (
+                  {completedOrdersList.map(({ order, items, tableNumber }) => (
                     <KitchenOrderCard
                       key={order.id}
                       orderId={order.id}
