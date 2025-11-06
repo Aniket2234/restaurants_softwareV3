@@ -374,6 +374,15 @@ export default function BillingPage() {
       return;
     }
 
+    if (serviceType === "dine-in" && !currentTableId) {
+      toast({
+        title: "Table not selected",
+        description: "Please select a floor and table before sending KOT",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (print && (serviceType === "delivery" || serviceType === "pickup")) {
       setPendingKotAction("kot-print");
       setShowCheckoutDialog(true);
@@ -414,6 +423,15 @@ export default function BillingPage() {
       toast({
         title: "Cart is empty",
         description: "Please add items before saving",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (serviceType === "dine-in" && !currentTableId) {
+      toast({
+        title: "Table not selected",
+        description: "Please select a floor and table before saving",
         variant: "destructive",
       });
       return;
@@ -636,6 +654,22 @@ export default function BillingPage() {
     }
   };
 
+  const handleFloorChange = (floorId: string) => {
+    setSelectedFloorId(floorId);
+    setSelectedTableFromDropdown("");
+  };
+
+  const handleTableChange = (tableId: string) => {
+    setSelectedTableFromDropdown(tableId);
+    const selectedTable = tables.find((t: any) => t.id === tableId);
+    if (selectedTable) {
+      setCurrentTableId(tableId);
+      setTableNumber(selectedTable.number);
+      const selectedFloor = floors.find((f: any) => f.id === selectedTable.floorId);
+      setFloorName(selectedFloor?.name || "");
+    }
+  };
+
   const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const tax = subtotal * 0.05;
   const total = subtotal + tax;
@@ -728,6 +762,13 @@ export default function BillingPage() {
             onSavePrint={handleSavePrint}
             selectedCustomer={selectedCustomer}
             onSelectCustomer={() => setShowCustomerDialog(true)}
+            currentTableId={currentTableId}
+            floors={floors}
+            tables={tables}
+            selectedFloorId={selectedFloorId}
+            selectedTableFromDropdown={selectedTableFromDropdown}
+            onFloorChange={handleFloorChange}
+            onTableChange={handleTableChange}
           />
         </div>
       </div>

@@ -43,6 +43,13 @@ interface OrderCartProps {
   onSavePrint?: () => void;
   selectedCustomer?: Customer | null;
   onSelectCustomer?: () => void;
+  currentTableId?: string | null;
+  floors?: any[];
+  tables?: any[];
+  selectedFloorId?: string;
+  selectedTableFromDropdown?: string;
+  onFloorChange?: (floorId: string) => void;
+  onTableChange?: (tableId: string) => void;
 }
 
 export default function OrderCart({
@@ -59,6 +66,13 @@ export default function OrderCart({
   onSavePrint,
   selectedCustomer,
   onSelectCustomer,
+  currentTableId,
+  floors = [],
+  tables = [],
+  selectedFloorId = "",
+  selectedTableFromDropdown = "",
+  onFloorChange,
+  onTableChange,
 }: OrderCartProps) {
   const [notesDialogItem, setNotesDialogItem] = useState<OrderItem | null>(null);
   const [tempNotes, setTempNotes] = useState("");
@@ -113,6 +127,46 @@ export default function OrderCart({
             </Button>
           ))}
         </div>
+        
+        {serviceType === "dine-in" && !currentTableId && (
+          <div className="mt-3 space-y-2">
+            <Select 
+              value={selectedFloorId} 
+              onValueChange={onFloorChange}
+            >
+              <SelectTrigger data-testid="select-floor">
+                <SelectValue placeholder="Select Floor" />
+              </SelectTrigger>
+              <SelectContent>
+                {floors.map((floor: any) => (
+                  <SelectItem key={floor.id} value={floor.id}>
+                    {floor.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            {selectedFloorId && (
+              <Select 
+                value={selectedTableFromDropdown} 
+                onValueChange={onTableChange}
+              >
+                <SelectTrigger data-testid="select-table">
+                  <SelectValue placeholder="Select Table" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tables
+                    .filter((table: any) => table.floorId === selectedFloorId && table.status === "free")
+                    .map((table: any) => (
+                      <SelectItem key={table.id} value={table.id}>
+                        Table {table.number}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        )}
         
         {(serviceType === "delivery" || serviceType === "pickup") && (
           <div className="mt-3">
