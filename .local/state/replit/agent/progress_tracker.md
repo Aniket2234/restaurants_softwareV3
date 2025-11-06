@@ -217,3 +217,7 @@
 [x] 217. Table selection properly updates currentTableId, tableNumber, and floorName
 [x] 218. Successfully tested implementation - floor/table selection works before KOT/Save actions
 [x] 219. ✅ FLOOR & TABLE SELECTION FEATURE COMPLETE: Users can now select tables when accessing Billing/POS directly
+[x] 220. Fixed table dropdown display bug - changed table.number to table.tableNumber
+[x] 221. Added capacity information to table dropdown - now shows "Table {number} ({seats} seats)"
+[x] 222. Fixed badge display at top - now properly shows floor and table badges when selected from dropdown
+[x] 223. ✅ TABLE SELECTION BUGS FIXED: Dropdowns now show proper table numbers with capacity, badges update correctly

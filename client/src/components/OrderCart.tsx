@@ -159,7 +159,7 @@ export default function OrderCart({
                     .filter((table: any) => table.floorId === selectedFloorId && table.status === "free")
                     .map((table: any) => (
                       <SelectItem key={table.id} value={table.id}>
-                        Table {table.number}
+                        Table {table.tableNumber} ({table.seats} seats)
                       </SelectItem>
                     ))}
                 </SelectContent>

@@ -664,7 +664,7 @@ export default function BillingPage() {
     const selectedTable = tables.find((t: any) => t.id === tableId);
     if (selectedTable) {
       setCurrentTableId(tableId);
-      setTableNumber(selectedTable.number);
+      setTableNumber(selectedTable.tableNumber);
       const selectedFloor = floors.find((f: any) => f.id === selectedTable.floorId);
       setFloorName(selectedFloor?.name || "");
     }
