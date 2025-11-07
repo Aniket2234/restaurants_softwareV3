@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus, Search, Phone, Mail, Edit, Trash2 } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Plus, Search, Phone, Mail, Edit, Trash2, Filter, ArrowUpDown } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import AppHeader from "@/components/AppHeader";
@@ -7,6 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,7 +23,6 @@ import { useToast } from "@/hooks/use-toast";
 interface CustomerWithStats extends Customer {
   totalOrders: number;
   totalSpent: number;
-  segment: "VIP" | "Regular" | "New";
   lastVisit: string;
 }
 
@@ -26,6 +31,7 @@ export default function CustomersPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [sortBy, setSortBy] = useState("name-asc");
   const { toast } = useToast();
 
   const { data: customers = [], isLoading } = useQuery<Customer[]>({
@@ -39,9 +45,6 @@ export default function CustomersPage() {
       const statsPromises = customersList.map(async (customer: Customer) => {
         const stats = await fetch(`/api/customers/${customer.id}/stats`).then(res => res.json());
         const totalSpent = stats.totalSpent || 0;
-        let segment: "VIP" | "Regular" | "New" = "New";
-        if (totalSpent > 10000) segment = "VIP";
-        else if (totalSpent > 3000 || stats.totalOrders > 5) segment = "Regular";
 
         const createdDate = new Date(customer.createdAt);
         const lastVisitDate = stats.lastVisit 
@@ -60,7 +63,6 @@ export default function CustomersPage() {
           ...customer,
           totalOrders: stats.totalOrders || 0,
           totalSpent,
-          segment,
           lastVisit: lastVisitText,
         };
       });
@@ -166,30 +168,47 @@ export default function CustomersPage() {
     }
   };
 
-  const getSegmentBadge = (segment: string) => {
-    const config: Record<string, string> = {
-      VIP: "bg-warning text-warning-foreground",
-      Regular: "bg-primary text-primary-foreground",
-      New: "bg-success text-success-foreground",
-    };
-
-    return <Badge className={config[segment]}>{segment}</Badge>;
-  };
-
   const displayCustomers = customersWithStats.length > 0 ? customersWithStats : customers.map(c => ({
     ...c,
     totalOrders: 0,
     totalSpent: 0,
-    segment: "New" as const,
     lastVisit: "Never",
   }));
 
-  const filteredCustomers = displayCustomers.filter(
-    (customer) =>
-      customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customer.phone.includes(searchQuery) ||
-      (customer.email && customer.email.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredAndSortedCustomers = useMemo(() => {
+    let result = [...displayCustomers];
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (customer) =>
+          customer.name.toLowerCase().includes(query) ||
+          customer.phone.includes(query) ||
+          (customer.email && customer.email.toLowerCase().includes(query))
+      );
+    }
+
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case "name-asc":
+          return a.name.localeCompare(b.name);
+        case "name-desc":
+          return b.name.localeCompare(a.name);
+        case "spent-desc":
+          return b.totalSpent - a.totalSpent;
+        case "spent-asc":
+          return a.totalSpent - b.totalSpent;
+        case "orders-desc":
+          return b.totalOrders - a.totalOrders;
+        case "orders-asc":
+          return a.totalOrders - b.totalOrders;
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [displayCustomers, searchQuery, sortBy]);
 
   return (
     <div className="h-screen flex flex-col">
@@ -207,30 +226,63 @@ export default function CustomersPage() {
               data-testid="input-customer-search"
             />
           </div>
-          <Button onClick={() => { addForm.reset(); setIsAddDialogOpen(true); }} data-testid="button-add-customer">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Customer
-          </Button>
-        </div>
-
-        <div className="flex gap-4 mt-4">
-          <div className="flex items-center gap-2">
-            <Badge className="bg-warning text-warning-foreground">VIP</Badge>
-            <span className="text-sm text-muted-foreground">
-              {displayCustomers.filter((c) => c.segment === "VIP").length}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge className="bg-primary text-primary-foreground">Regular</Badge>
-            <span className="text-sm text-muted-foreground">
-              {displayCustomers.filter((c) => c.segment === "Regular").length}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge className="bg-success text-success-foreground">New</Badge>
-            <span className="text-sm text-muted-foreground">
-              {displayCustomers.filter((c) => c.segment === "New").length}
-            </span>
+          <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" data-testid="button-sort-customers">
+                  <ArrowUpDown className="h-4 w-4 mr-2" />
+                  Sort
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuCheckboxItem
+                  checked={sortBy === "name-asc"}
+                  onCheckedChange={() => setSortBy("name-asc")}
+                  data-testid="sort-name-asc"
+                >
+                  Name (A-Z)
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={sortBy === "name-desc"}
+                  onCheckedChange={() => setSortBy("name-desc")}
+                  data-testid="sort-name-desc"
+                >
+                  Name (Z-A)
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={sortBy === "spent-desc"}
+                  onCheckedChange={() => setSortBy("spent-desc")}
+                  data-testid="sort-spent-desc"
+                >
+                  Total Spent (High to Low)
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={sortBy === "spent-asc"}
+                  onCheckedChange={() => setSortBy("spent-asc")}
+                  data-testid="sort-spent-asc"
+                >
+                  Total Spent (Low to High)
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={sortBy === "orders-desc"}
+                  onCheckedChange={() => setSortBy("orders-desc")}
+                  data-testid="sort-orders-desc"
+                >
+                  Orders (Most to Least)
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={sortBy === "orders-asc"}
+                  onCheckedChange={() => setSortBy("orders-asc")}
+                  data-testid="sort-orders-asc"
+                >
+                  Orders (Least to Most)
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button onClick={() => { addForm.reset(); setIsAddDialogOpen(true); }} data-testid="button-add-customer">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Customer
+            </Button>
           </div>
         </div>
       </div>
@@ -238,7 +290,7 @@ export default function CustomersPage() {
       <div className="flex-1 overflow-y-auto p-6">
         {isLoading ? (
           <div className="text-center py-8 text-muted-foreground">Loading customers...</div>
-        ) : filteredCustomers.length === 0 ? (
+        ) : filteredAndSortedCustomers.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             {searchQuery ? "No customers found matching your search" : "No customers yet. Add your first customer!"}
           </div>
@@ -249,7 +301,6 @@ export default function CustomersPage() {
                 <tr className="border-b border-border">
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Customer</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Contact</th>
-                  <th className="text-center py-3 px-4 font-medium text-muted-foreground">Segment</th>
                   <th className="text-right py-3 px-4 font-medium text-muted-foreground">Orders</th>
                   <th className="text-right py-3 px-4 font-medium text-muted-foreground">Total Spent</th>
                   <th className="text-right py-3 px-4 font-medium text-muted-foreground">Last Visit</th>
@@ -257,7 +308,7 @@ export default function CustomersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredCustomers.map((customer) => (
+                {filteredAndSortedCustomers.map((customer) => (
                   <tr key={customer.id} className="border-b border-border last:border-0 hover-elevate" data-testid={`customer-row-${customer.id}`}>
                     <td className="py-3 px-4">
                       <p className="font-medium" data-testid={`text-customer-name-${customer.id}`}>{customer.name}</p>
@@ -276,7 +327,6 @@ export default function CustomersPage() {
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-center">{getSegmentBadge(customer.segment)}</td>
                     <td className="py-3 px-4 text-right" data-testid={`text-customer-orders-${customer.id}`}>{customer.totalOrders}</td>
                     <td className="py-3 px-4 text-right font-semibold" data-testid={`text-customer-spent-${customer.id}`}>₹{customer.totalSpent.toLocaleString()}</td>
                     <td className="py-3 px-4 text-right text-muted-foreground">{customer.lastVisit}</td>

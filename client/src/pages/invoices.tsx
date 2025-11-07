@@ -1,9 +1,17 @@
-import { useState } from "react";
-import { Plus, Download, Send, Eye, Edit, Trash2, RefreshCw, X, Minus, StickyNote } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Plus, Download, Send, Eye, Edit, Trash2, RefreshCw, X, Minus, StickyNote, Search, Filter, ArrowUpDown } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import AppHeader from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +57,10 @@ export default function InvoicesPage() {
   const [notesItem, setNotesItem] = useState<InvoiceItem | null>(null);
   const [tempNotes, setTempNotes] = useState("");
   const [customNote, setCustomNote] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string[]>(["all"]);
+  const [filterPayment, setFilterPayment] = useState<string[]>(["all"]);
+  const [sortBy, setSortBy] = useState("date-desc");
   const { toast } = useToast();
 
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
@@ -64,6 +76,49 @@ export default function InvoicesPage() {
     queryKey: ["/api/menu/categories"],
     enabled: showRegenerateDialog,
   });
+
+  const filteredAndSortedInvoices = useMemo(() => {
+    let result = [...invoices];
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (invoice) =>
+          invoice.invoiceNumber.toLowerCase().includes(query) ||
+          (invoice.customerName && invoice.customerName.toLowerCase().includes(query)) ||
+          (invoice.tableNumber && invoice.tableNumber.toLowerCase().includes(query))
+      );
+    }
+
+    if (!filterStatus.includes("all")) {
+      result = result.filter((invoice) => filterStatus.includes(invoice.status));
+    }
+
+    if (!filterPayment.includes("all")) {
+      result = result.filter((invoice) => filterPayment.includes(invoice.paymentMode));
+    }
+
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case "date-desc":
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case "date-asc":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "amount-desc":
+          return parseFloat(b.total) - parseFloat(a.total);
+        case "amount-asc":
+          return parseFloat(a.total) - parseFloat(b.total);
+        case "invoice-asc":
+          return a.invoiceNumber.localeCompare(b.invoiceNumber);
+        case "invoice-desc":
+          return b.invoiceNumber.localeCompare(a.invoiceNumber);
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [invoices, searchQuery, filterStatus, filterPayment, sortBy]);
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, string> = {
@@ -355,10 +410,173 @@ export default function InvoicesPage() {
     });
   };
 
+  const handleStatusFilter = (status: string) => {
+    if (status === "all") {
+      setFilterStatus(["all"]);
+    } else {
+      const newFilters = filterStatus.filter(f => f !== "all");
+      if (newFilters.includes(status)) {
+        const updated = newFilters.filter(f => f !== status);
+        setFilterStatus(updated.length === 0 ? ["all"] : updated);
+      } else {
+        setFilterStatus([...newFilters, status]);
+      }
+    }
+  };
+
+  const handlePaymentFilter = (payment: string) => {
+    if (payment === "all") {
+      setFilterPayment(["all"]);
+    } else {
+      const newFilters = filterPayment.filter(f => f !== "all");
+      if (newFilters.includes(payment)) {
+        const updated = newFilters.filter(f => f !== payment);
+        setFilterPayment(updated.length === 0 ? ["all"] : updated);
+      } else {
+        setFilterPayment([...newFilters, payment]);
+      }
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col">
       <AppHeader title="Invoice Management" />
       <div className="p-6 border-b border-border bg-muted/30">
+        <div className="flex items-center justify-between mb-4">
+          <div className="relative w-96">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by invoice number, customer, or table..."
+              className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              data-testid="input-invoice-search"
+            />
+          </div>
+          <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" data-testid="button-filter-status">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filter
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Status</DropdownMenuLabel>
+                <DropdownMenuCheckboxItem
+                  checked={filterStatus.includes("all")}
+                  onCheckedChange={() => handleStatusFilter("all")}
+                  data-testid="filter-status-all"
+                >
+                  All Status
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filterStatus.includes("Paid")}
+                  onCheckedChange={() => handleStatusFilter("Paid")}
+                  data-testid="filter-status-paid"
+                >
+                  Paid
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filterStatus.includes("Pending")}
+                  onCheckedChange={() => handleStatusFilter("Pending")}
+                  data-testid="filter-status-pending"
+                >
+                  Pending
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filterStatus.includes("Overdue")}
+                  onCheckedChange={() => handleStatusFilter("Overdue")}
+                  data-testid="filter-status-overdue"
+                >
+                  Overdue
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Payment Method</DropdownMenuLabel>
+                <DropdownMenuCheckboxItem
+                  checked={filterPayment.includes("all")}
+                  onCheckedChange={() => handlePaymentFilter("all")}
+                  data-testid="filter-payment-all"
+                >
+                  All Methods
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filterPayment.includes("cash")}
+                  onCheckedChange={() => handlePaymentFilter("cash")}
+                  data-testid="filter-payment-cash"
+                >
+                  Cash
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filterPayment.includes("upi")}
+                  onCheckedChange={() => handlePaymentFilter("upi")}
+                  data-testid="filter-payment-upi"
+                >
+                  UPI
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filterPayment.includes("card")}
+                  onCheckedChange={() => handlePaymentFilter("card")}
+                  data-testid="filter-payment-card"
+                >
+                  Card
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" data-testid="button-sort">
+                  <ArrowUpDown className="h-4 w-4 mr-2" />
+                  Sort
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuCheckboxItem
+                  checked={sortBy === "date-desc"}
+                  onCheckedChange={() => setSortBy("date-desc")}
+                  data-testid="sort-date-desc"
+                >
+                  Date (Newest First)
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={sortBy === "date-asc"}
+                  onCheckedChange={() => setSortBy("date-asc")}
+                  data-testid="sort-date-asc"
+                >
+                  Date (Oldest First)
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={sortBy === "amount-desc"}
+                  onCheckedChange={() => setSortBy("amount-desc")}
+                  data-testid="sort-amount-desc"
+                >
+                  Amount (High to Low)
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={sortBy === "amount-asc"}
+                  onCheckedChange={() => setSortBy("amount-asc")}
+                  data-testid="sort-amount-asc"
+                >
+                  Amount (Low to High)
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={sortBy === "invoice-asc"}
+                  onCheckedChange={() => setSortBy("invoice-asc")}
+                  data-testid="sort-invoice-asc"
+                >
+                  Invoice No. (A-Z)
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={sortBy === "invoice-desc"}
+                  onCheckedChange={() => setSortBy("invoice-desc")}
+                  data-testid="sort-invoice-desc"
+                >
+                  Invoice No. (Z-A)
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
         <div className="flex justify-between">
           <div className="flex gap-4">
             <div className="flex items-center gap-2"><Badge className="bg-success">Paid</Badge><span className="text-sm">{invoices.filter(i => i.status === "Paid").length}</span></div>
@@ -366,7 +584,7 @@ export default function InvoicesPage() {
             <div className="flex items-center gap-2"><Badge className="bg-danger">Overdue</Badge><span className="text-sm">{invoices.filter(i => i.status === "Overdue").length}</span></div>
           </div>
           <div className="text-sm text-muted-foreground">
-            Total: {invoices.length} invoice{invoices.length !== 1 ? 's' : ''}
+            Total: {filteredAndSortedInvoices.length} invoice{filteredAndSortedInvoices.length !== 1 ? 's' : ''}
           </div>
         </div>
       </div>
@@ -375,10 +593,16 @@ export default function InvoicesPage() {
           <div className="text-center py-12 text-gray-500">
             <div className="animate-pulse">Loading invoices...</div>
           </div>
-        ) : invoices.length === 0 ? (
+        ) : filteredAndSortedInvoices.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
-            <p className="mb-2">No invoices yet</p>
-            <p className="text-sm">Invoices will be generated automatically when you complete orders</p>
+            {searchQuery || !filterStatus.includes("all") || !filterPayment.includes("all") ? (
+              <p className="mb-2">No invoices match your filters</p>
+            ) : (
+              <>
+                <p className="mb-2">No invoices yet</p>
+                <p className="text-sm">Invoices will be generated automatically when you complete orders</p>
+              </>
+            )}
           </div>
         ) : (
           <div className="bg-card rounded-lg border border-card-border">
@@ -395,7 +619,7 @@ export default function InvoicesPage() {
                 </tr>
               </thead>
               <tbody>
-                {invoices.map((invoice) => (
+                {filteredAndSortedInvoices.map((invoice) => (
                   <tr key={invoice.id} className="border-b border-border last:border-0 hover-elevate">
                     <td className="py-3 px-4 font-medium">{invoice.invoiceNumber}</td>
                     <td className="py-3 px-4">
