@@ -1,0 +1,205 @@
+================================================================================
+DIGITAL MENU - CART & ORDERING FUNCTIONALITY IMPLEMENTATION PROMPT
+================================================================================
+
+PROJECT CONTEXT:
+----------------
+This is a comprehensive Restaurant POS System built with:
+- Frontend: React + TypeScript + Vite + Wouter (routing) + TanStack Query
+- Backend: Express + Node.js
+- Database: MongoDB (persistent storage via MONGODB_URI secret)
+- Real-time: WebSocket on /api/ws for live updates
+- UI: Shadcn components + Tailwind CSS
+- Port: 5000 (webview output type)
+
+EXISTING SYSTEM FEATURES:
+-------------------------
+✅ Reservation Management
+✅ Table Management (floors, tables, status tracking)
+✅ Billing/POS System (order creation, item selection, billing)
+✅ Kitchen Display System (KOT management, real-time updates)
+✅ Menu Management (categories, items with images, veg/non-veg indicators)
+✅ Customer Management (loyalty program, feedback tracking)
+✅ Invoice Management (PDF generation and regeneration)
+✅ Real-time WebSocket updates across all modules
+
+CURRENT DIGITAL MENU STATUS:
+----------------------------
+The Digital Menu page already exists and displays:
+- Menu items organized by categories (horizontal scrollable category carousel)
+- Category images with names (New, Soups, Veg Starter, Chicken Starter, Prawns Starter, Sea Food, Spring Rolls, etc.)
+- Menu item cards showing:
+  - Item image
+  - Item name
+  - Description
+  - Price (₹)
+  - Veg/Non-veg indicator (green/red dot)
+- Responsive grid layout with beautiful card design
+
+WHAT NEEDS TO BE IMPLEMENTED:
+------------------------------
+
+1. QR CODE TABLE DETECTION:
+   - When customer scans QR code, the Digital Menu opens with table number in URL
+   - QR code URL format: /digital-menu?table=T1 (or similar pattern)
+   - Extract table number from URL query parameter on page load
+   - Display table number prominently in the header/top of Digital Menu
+   - Validate that table exists and is active in the system
+
+2. CART FUNCTIONALITY:
+   - Add "Add to Cart" button on each menu item card
+   - Implement quantity selector (- and + buttons) with numeric input
+   - Show floating cart icon/button with item count badge (e.g., "🛒 3 items")
+   - Cart should be stored in component state or React Context
+   - Cart items should include: itemId, itemName, price, quantity, image, category
+   - Allow users to view cart summary (overlay/modal or separate section)
+   - In cart view, show:
+     - List of items with name, price, quantity
+     - Ability to increase/decrease quantity or remove items
+     - Subtotal calculation
+     - Optional: Add special instructions/notes for each item or order
+
+3. ORDERING FUNCTIONALITY (Same as Billing/POS):
+   - "Place Order" button in cart view
+   - When order is placed:
+     a) Create new order in MongoDB with same schema as POS orders
+     b) Include table number (from QR code)
+     c) Set order status as "pending" or "placed"
+     d) Generate KOT automatically (Kitchen Order Ticket)
+     e) Send WebSocket update to notify Kitchen Display
+     f) Show order confirmation to customer
+     g) Clear cart after successful order placement
+   
+4. ORDER INTEGRATION WITH EXISTING SYSTEM:
+   - Orders from Digital Menu should appear in:
+     - Kitchen Display (for preparation)
+     - Billing/POS (for payment processing when customer requests bill)
+     - Table Management (update table status to "occupied" if needed)
+   - Use the SAME order schema and API endpoints as existing Billing/POS
+   - Maintain consistency in order structure and flow
+
+5. UI/UX REQUIREMENTS:
+   - Mobile-first responsive design (customers will use phones)
+   - Smooth animations for adding to cart
+   - Clear visual feedback when items are added
+   - Easy-to-use cart interface
+   - Confirmation dialog before placing order
+   - Success message after order is placed
+   - Option to view order status (if desired)
+   - Back button to continue browsing menu
+
+6. DATA TESTID ATTRIBUTES:
+   - Add data-testid to all interactive elements:
+     - button-add-to-cart-{itemId}
+     - button-increase-quantity-{itemId}
+     - button-decrease-quantity-{itemId}
+     - input-quantity-{itemId}
+     - button-view-cart
+     - button-place-order
+     - text-cart-count
+     - text-table-number
+     - text-order-total
+
+TECHNICAL IMPLEMENTATION NOTES:
+--------------------------------
+
+FILE STRUCTURE:
+- Digital Menu page: client/src/pages/digital-menu.tsx (ALREADY EXISTS)
+- Add Cart component: client/src/components/cart.tsx (NEW)
+- Add CartContext or use React state management (NEW if needed)
+- Backend routes: server/routes.ts (UPDATE - reuse existing order endpoints)
+- Schema: shared/schema.ts (USE EXISTING - orders, tables, menuItems)
+- Storage: server/mongo-storage.ts (USE EXISTING - order CRUD operations)
+
+KEY PATTERNS TO FOLLOW:
+1. Use TanStack Query for data fetching (useQuery, useMutation)
+2. Use Zod schemas from shared/schema.ts for validation
+3. Use apiRequest from @lib/queryClient for POST requests
+4. Invalidate query cache after mutations
+5. Use WebSocket for real-time updates (import from @/hooks/use-websocket)
+6. Use existing shadcn components (Button, Card, Dialog, Badge, etc.)
+7. Follow existing code style and patterns from billing.tsx
+
+WEBSOCKET INTEGRATION:
+- Listen for order updates: { type: 'orderUpdate', data: {...} }
+- Broadcast when order is placed from Digital Menu
+- Kitchen Display will automatically receive updates
+
+EXAMPLE CART STATE STRUCTURE:
+```typescript
+type CartItem = {
+  itemId: string;
+  itemName: string;
+  price: number;
+  quantity: number;
+  image?: string;
+  category?: string;
+  specialInstructions?: string;
+};
+
+type CartState = {
+  tableNumber: string;
+  items: CartItem[];
+  total: number;
+};
+```
+
+EXAMPLE ORDER CREATION (reuse existing POS order schema):
+```typescript
+const order = {
+  tableId: tableNumber, // from QR code
+  items: cartItems.map(item => ({
+    menuItemId: item.itemId,
+    quantity: item.quantity,
+    specialInstructions: item.specialInstructions,
+  })),
+  status: 'pending',
+  source: 'digital-menu', // to differentiate from POS orders
+  // ... other fields as per existing schema
+};
+```
+
+IMPORTANT REMINDERS:
+--------------------
+1. DO NOT create new order schema - USE EXISTING schema from shared/schema.ts
+2. DO NOT create new storage methods - USE EXISTING methods from mongo-storage.ts
+3. Ensure MongoDB connection is established (MONGODB_URI secret must be set)
+4. Test QR code URL format before implementing (decide on query param structure)
+5. Ensure WebSocket connection works for real-time Kitchen Display updates
+6. Follow mobile-first responsive design (most customers will use phones)
+7. Add proper error handling (table not found, order placement failed, etc.)
+8. Show loading states during order placement
+9. Clear cart only after successful order confirmation
+10. Consider adding order history view for customers (optional enhancement)
+
+VALIDATION & TESTING:
+---------------------
+After implementation, verify:
+✓ QR code scanning extracts table number correctly
+✓ Table number is displayed and validated
+✓ Items can be added to cart with quantity
+✓ Cart total calculates correctly
+✓ Cart can be viewed and edited
+✓ Order placement creates order in MongoDB
+✓ Kitchen Display receives order via WebSocket
+✓ Order appears in Billing/POS for payment processing
+✓ Cart clears after successful order
+✓ Error handling works (network errors, validation errors)
+✓ Mobile responsive design works on various screen sizes
+
+OPTIONAL ENHANCEMENTS (if time permits):
+-----------------------------------------
+- View placed orders history for the table
+- Order status tracking (pending → preparing → ready → served)
+- Allow customers to call waiter (notification button)
+- Estimated preparation time display
+- Menu item search/filter functionality
+- Dietary filters (veg/non-veg, allergies, etc.)
+- Popular items badge or recommendations
+- Multi-language support
+- Dark mode toggle
+
+================================================================================
+END OF PROMPT - Copy and paste this entire content to implement Digital Menu
+cart and ordering functionality in your Restaurant POS System.
+================================================================================
