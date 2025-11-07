@@ -514,7 +514,8 @@ export default function MenuPage() {
             {isLoading ? (
               <div className="text-center py-8 text-muted-foreground">Loading menu...</div>
             ) : (
-              <div className="bg-card rounded-lg border border-card-border overflow-x-auto">
+              <>
+              <div className="hidden md:block bg-card rounded-lg border border-card-border overflow-x-auto">
                 <table className="w-full min-w-[900px]">
               <thead>
                 <tr className="border-b border-border">
@@ -604,6 +605,83 @@ export default function MenuPage() {
                 </tbody>
               </table>
             </div>
+
+              <div className="md:hidden space-y-3">
+                {sortedItems.map((item) => {
+                  const price = parseFloat(item.price);
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-card rounded-lg border border-card-border p-4 space-y-3"
+                      data-testid={`menu-item-${item.id}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant={item.isVeg ? "default" : "destructive"} data-testid={`badge-type-${item.id}`}>
+                              {item.isVeg ? "Veg" : "Non-Veg"}
+                            </Badge>
+                            <Badge variant="secondary">{item.category}</Badge>
+                          </div>
+                          <h3 className="font-medium text-base">{item.name}</h3>
+                          {item.description && (
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                              {item.description}
+                            </p>
+                          )}
+                        </div>
+                        {item.image && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 shrink-0"
+                            onClick={() => openImageViewer(item.image)}
+                            data-testid={`button-view-image-${item.id}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="text-lg font-bold">₹{price.toFixed(2)}</div>
+                        <Button
+                          size="sm"
+                          variant={item.available ? "default" : "secondary"}
+                          onClick={() => toggleAvailability(item.id, item.available)}
+                          data-testid={`button-toggle-${item.id}`}
+                        >
+                          {item.available ? "Available" : "Unavailable"}
+                        </Button>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2 border-t">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => openEditDialog(item)}
+                          data-testid={`button-edit-${item.id}`}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 text-destructive hover:text-destructive"
+                          onClick={() => deleteMenuItemMutation.mutate(item.id)}
+                          data-testid={`button-delete-${item.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Plus, Download, Send, Eye, Edit, Trash2, RefreshCw, X, Minus, StickyNote, Search, Filter, ArrowUpDown } from "lucide-react";
+import { Plus, Download, Send, Eye, Edit, Trash2, RefreshCw, X, Minus, StickyNote, Search, Filter, ArrowUpDown, MoreVertical } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import AppHeader from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
+  DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel,
@@ -605,7 +606,8 @@ export default function InvoicesPage() {
             )}
           </div>
         ) : (
-          <div className="bg-card rounded-lg border border-card-border overflow-x-auto">
+          <>
+          <div className="hidden md:block bg-card rounded-lg border border-card-border overflow-x-auto">
             <table className="w-full min-w-[800px]">
               <thead>
                 <tr className="border-b border-border">
@@ -646,6 +648,84 @@ export default function InvoicesPage() {
               </tbody>
             </table>
           </div>
+
+          <div className="md:hidden space-y-3">
+            {filteredAndSortedInvoices.map((invoice) => (
+              <div
+                key={invoice.id}
+                className="bg-card rounded-lg border border-card-border p-4 space-y-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-lg mb-1">{invoice.invoiceNumber}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {invoice.customerName || (invoice.tableNumber ? `Table ${invoice.tableNumber}` : "Walk-in")}
+                      {invoice.floorName && <span className="ml-1">({invoice.floorName})</span>}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">{formatDate(invoice.createdAt)}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-lg">₹{parseFloat(invoice.total).toLocaleString()}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="uppercase text-xs">{invoice.paymentMode}</Badge>
+                  {getStatusBadge(invoice.status)}
+                </div>
+
+                <div className="flex items-center gap-2 pt-2 border-t">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => handleViewInvoice(invoice)}
+                    data-testid={`button-view-${invoice.id}`}
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    View
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => handleDownloadInvoice(invoice)}
+                    data-testid={`button-download-${invoice.id}`}
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    PDF
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" variant="outline" className="px-2">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleEditInvoice(invoice)} data-testid={`button-edit-${invoice.id}`}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleRegenerateInvoice(invoice)} data-testid={`button-regenerate-${invoice.id}`}>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Regenerate
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => handleDeleteInvoice(invoice)}
+                        data-testid={`button-delete-${invoice.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            ))}
+          </div>
+          </>
         )}
       </div>
 

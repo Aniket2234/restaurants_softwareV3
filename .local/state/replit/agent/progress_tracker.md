@@ -475,3 +475,25 @@
 [x] 475. Category filtering works seamlessly with search and item count display
 [x] 476. Successfully restarted application - now running on port 5000
 [x] 477. ✅ MOBILE CATEGORY DROPDOWN COMPLETE: Mobile users can now filter by category using dropdown selector
+[x] 478. MOBILE RESPONSIVE CARD LAYOUTS: Fixed horizontal scrolling on Menu and Invoice pages (November 07, 2025)
+[x] 479. MENU PAGE MOBILE FIX: Created card-based mobile layout replacing table view
+[x] 480. Desktop menu table hidden on mobile (hidden md:block), visible on desktop
+[x] 481. Mobile menu cards show: Veg/Non-Veg badge, category badge, item name, description (2 lines max), price
+[x] 482. Mobile menu cards include: View image button (if available), availability toggle, edit and delete buttons
+[x] 483. Cards use full width on mobile (no horizontal scroll), vertical scrolling only
+[x] 484. All menu item data displayed in mobile-friendly card format with proper spacing
+[x] 485. Edit and Delete buttons side-by-side in mobile card footer with icons
+[x] 486. INVOICE PAGE MOBILE FIX: Created card-based mobile layout replacing table view
+[x] 487. Desktop invoice table hidden on mobile (hidden md:block), visible on desktop
+[x] 488. Mobile invoice cards show: Invoice number, customer/table name, floor name, date, amount
+[x] 489. Mobile invoice cards include: Payment method badge and status badge
+[x] 490. Mobile invoice cards have action buttons: View, Download PDF, and More menu (dropdown)
+[x] 491. More dropdown menu on mobile contains: Edit, Regenerate, and Delete options
+[x] 492. Added MoreVertical icon import to lucide-react for invoice mobile dropdown
+[x] 493. Added DropdownMenuItem to invoice page imports for mobile action menu
+[x] 494. Fixed all 7 LSP diagnostics in invoices.tsx (missing imports)
+[x] 495. Both pages now use responsive design: cards on mobile (md:hidden), tables on desktop (hidden md:block)
+[x] 496. Cards optimized for vertical scrolling only - no horizontal scroll on mobile devices
+[x] 497. Full-width card layouts ensure all content is visible without horizontal panning
+[x] 498. Successfully restarted application - now running on port 5000
+[x] 499. ✅ MOBILE RESPONSIVE LAYOUTS COMPLETE: No horizontal scrolling, vertical-only navigation on Menu and Invoices pages
