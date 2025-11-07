@@ -1,0 +1,1689 @@
+################################################################################
+#                                                                              #
+#           RESTAURANT POS SYSTEM - DIGITAL MENU CART IMPLEMENTATION          #
+#                     COMPLETE ARCHITECTURAL GUIDE                             #
+#                                                                              #
+#            READ THIS ENTIRE DOCUMENT BEFORE STARTING WORK                    #
+#                                                                              #
+################################################################################
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION 1: CURRENT SYSTEM OVERVIEW
+═══════════════════════════════════════════════════════════════════════════════
+
+This is a COMPREHENSIVE RESTAURANT POS SYSTEM already built and operational.
+You are adding NEW FUNCTIONALITY to an EXISTING, working system.
+
+TECHNOLOGY STACK:
+-----------------
+Frontend:
+  • React 18 with TypeScript
+  • Vite (build tool and dev server)
+  • Wouter (client-side routing, NOT React Router)
+  • TanStack Query v5 (data fetching and caching)
+  • Shadcn UI components + Tailwind CSS
+  • Lucide React icons
+
+Backend:
+  • Node.js + Express
+  • TypeScript (tsx runtime)
+  • WebSocket server (ws library) for real-time updates
+
+Database:
+  • MongoDB (persistent storage)
+  • Connection via MONGODB_URI environment secret
+  • All data stored in MongoDB collections
+
+Real-time Communication:
+  • WebSocket server at path: /api/ws
+  • Broadcasts updates to all connected clients
+  • Automatic cache invalidation via TanStack Query
+
+Development Environment:
+  • Runs on Replit platform
+  • Port 5000 (webview output type)
+  • Single command: npm run dev (starts both frontend and backend)
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION 2: COMPLETE DATA MODEL (shared/schema.ts)
+═══════════════════════════════════════════════════════════════════════════════
+
+The system uses TypeScript interfaces and Zod schemas defined in shared/schema.ts.
+ALL entities are stored in MongoDB. Here are the EXACT schemas you must use:
+
+2.1 FLOOR ENTITY
+-----------------
+```typescript
+interface Floor {
+  id: string;
+  name: string;               // e.g., "Ground Floor", "First Floor"
+  displayOrder: number;        // Sort order
+  createdAt: Date;
+}
+
+const insertFloorSchema = z.object({
+  name: z.string(),
+  displayOrder: z.number().default(0),
+});
+```
+
+2.2 TABLE ENTITY
+-----------------
+```typescript
+interface Table {
+  id: string;
+  tableNumber: string;         // e.g., "T1", "T2", "A5"
+  seats: number;               // Number of people it can seat
+  status: string;              // "free", "occupied", "reserved", "cleaning"
+  currentOrderId: string | null;  // Links to active Order
+  floorId: string | null;      // Which floor this table is on
+}
+
+const insertTableSchema = z.object({
+  tableNumber: z.string(),
+  seats: z.number(),
+  status: z.string().default("free"),
+  floorId: z.string().nullable().optional(),
+});
+```
+
+2.3 MENU ITEM ENTITY
+---------------------
+```typescript
+interface MenuItem {
+  id: string;
+  name: string;                // e.g., "Chicken 65", "Veg Clear Soup"
+  category: string;            // e.g., "Soups", "Chicken Starter", "Main Course"
+  price: string;               // Stored as string: "130", "280"
+  cost: string;                // Cost price
+  available: boolean;          // Is item currently available?
+  isVeg: boolean;             // true = vegetarian, false = non-veg
+  variants: string[] | null;   // e.g., ["Small", "Medium", "Large"]
+  image: string | null;        // URL or path to image
+  description: string | null;  // Item description
+}
+
+const insertMenuItemSchema = z.object({
+  name: z.string(),
+  category: z.string(),
+  price: z.string(),
+  cost: z.string(),
+  available: z.boolean().default(true),
+  isVeg: z.boolean().default(true),
+  variants: z.array(z.string()).nullable().optional(),
+  image: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+});
+```
+
+2.4 ORDER ENTITY (CRITICAL FOR YOUR WORK)
+-------------------------------------------
+```typescript
+interface Order {
+  id: string;
+  tableId: string | null;           // Which table (can be null for delivery/pickup)
+  orderType: string;                // "dine-in", "delivery", "pickup"
+  status: string;                   // "saved", "pending", "preparing", "ready", "completed", "paid"
+  total: string;                    // Total amount as string
+  customerName: string | null;      // For delivery/pickup
+  customerPhone: string | null;
+  customerAddress: string | null;
+  paymentMode: string | null;       // "cash", "card", "upi"
+  waiterId: string | null;
+  deliveryPersonId: string | null;
+  expectedPickupTime: Date | null;
+  createdAt: Date;
+  completedAt: Date | null;
+  billedAt: Date | null;
+  paidAt: Date | null;
+}
+
+const insertOrderSchema = z.object({
+  tableId: z.string().nullable().optional(),
+  orderType: z.string(),          // REQUIRED: "dine-in", "delivery", "pickup"
+  status: z.string().default("saved"),
+  total: z.string().default("0"),
+  customerName: z.string().nullable().optional(),
+  customerPhone: z.string().nullable().optional(),
+  customerAddress: z.string().nullable().optional(),
+  paymentMode: z.string().nullable().optional(),
+  waiterId: z.string().nullable().optional(),
+  deliveryPersonId: z.string().nullable().optional(),
+  expectedPickupTime: z.coerce.date().nullable().optional(),
+});
+```
+
+2.5 ORDER ITEM ENTITY (CRITICAL FOR YOUR WORK)
+------------------------------------------------
+Each order has multiple order items (the individual menu items in the order).
+
+```typescript
+interface OrderItem {
+  id: string;
+  orderId: string;              // Links to Order
+  menuItemId: string;           // Links to MenuItem
+  name: string;                 // Item name (copied from menu)
+  quantity: number;             // How many of this item
+  price: string;                // Price per item
+  notes: string | null;         // Special instructions: "Extra spicy", "No onions"
+  status: string;               // "new", "preparing", "ready", "served"
+  isVeg: boolean;              // Copied from menu item
+}
+
+const insertOrderItemSchema = z.object({
+  orderId: z.string(),
+  menuItemId: z.string(),
+  name: z.string(),
+  quantity: z.number(),
+  price: z.string(),
+  notes: z.string().nullable().optional(),
+  status: z.string().default("new"),
+  isVeg: z.boolean().default(true),
+});
+```
+
+2.6 CUSTOMER ENTITY
+--------------------
+```typescript
+interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  address: string | null;
+  createdAt: Date;
+}
+
+const insertCustomerSchema = z.object({
+  name: z.string(),
+  phone: z.string(),
+  email: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
+});
+```
+
+2.7 INVOICE ENTITY
+-------------------
+```typescript
+interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  orderId: string;
+  tableNumber: string | null;
+  floorName: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  subtotal: string;
+  tax: string;
+  discount: string;
+  total: string;
+  paymentMode: string;
+  splitPayments: string | null;  // JSON string
+  status: string;                // "Paid", "Pending", "Cancelled"
+  items: string;                 // JSON string of items
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+2.8 RESERVATION ENTITY
+-----------------------
+```typescript
+interface Reservation {
+  id: string;
+  tableId: string;
+  customerName: string;
+  customerPhone: string;
+  numberOfPeople: number;
+  timeSlot: Date;
+  notes: string | null;
+  status: string;              // "active", "completed", "cancelled"
+  createdAt: Date;
+}
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION 3: BACKEND ARCHITECTURE (server/)
+═══════════════════════════════════════════════════════════════════════════════
+
+3.1 FILE STRUCTURE
+-------------------
+server/
+  ├── index.ts                    # Entry point, starts Express + Vite
+  ├── routes.ts                   # ALL API endpoints (1100+ lines)
+  ├── mongodb.ts                  # MongoDB connection setup
+  ├── mongo-storage.ts            # Storage layer (CRUD operations)
+  ├── storage.ts                  # Storage interface + exports
+  ├── vite.ts                     # Vite dev server setup
+  └── utils/
+      ├── invoiceGenerator.ts     # PDF invoice generation
+      └── kotGenerator.ts         # KOT (Kitchen Order Ticket) PDF
+
+3.2 MONGODB CONNECTION (server/mongodb.ts)
+-------------------------------------------
+The system connects to MongoDB using the MONGODB_URI environment secret:
+
+```typescript
+import { MongoClient } from 'mongodb';
+
+const client = new MongoClient(process.env.MONGODB_URI!);
+await client.connect();
+const db = client.db('restaurant_pos');
+
+// Collections:
+const floors = db.collection('floors');
+const tables = db.collection('tables');
+const menuItems = db.collection('menu_items');
+const orders = db.collection('orders');
+const orderItems = db.collection('order_items');
+const customers = db.collection('customers');
+const invoices = db.collection('invoices');
+const reservations = db.collection('reservations');
+// ... and more
+```
+
+3.3 STORAGE LAYER (server/mongo-storage.ts)
+---------------------------------------------
+ALL database operations go through MongoStorage class.
+This is imported in server/storage.ts as:
+
+```typescript
+export const storage = new MongoStorage();
+```
+
+Key methods you'll use:
+
+For Orders:
+  • createOrder(data: InsertOrder): Promise<Order>
+  • getOrder(id: string): Promise<Order | undefined>
+  • getOrders(): Promise<Order[]>
+  • getActiveOrders(): Promise<Order[]>           // status NOT 'completed' or 'paid'
+  • updateOrder(id: string, data: Partial<Order>): Promise<Order | undefined>
+  • updateOrderStatus(id: string, status: string): Promise<Order | undefined>
+
+For Order Items:
+  • createOrderItem(data: InsertOrderItem): Promise<OrderItem>
+  • getOrderItems(orderId: string): Promise<OrderItem[]>
+  • updateOrderItem(id: string, data: Partial<OrderItem>): Promise<OrderItem | undefined>
+  • deleteOrderItem(id: string): Promise<boolean>
+  • updateOrderItemStatus(id: string, status: string): Promise<OrderItem | undefined>
+
+For Tables:
+  • getTable(id: string): Promise<Table | undefined>
+  • getTables(): Promise<Table[]>
+  • updateTableStatus(id: string, status: string): Promise<Table | undefined>
+  • updateTableOrder(id: string, orderId: string | null): Promise<Table | undefined>
+
+For Menu Items:
+  • getMenuItems(): Promise<MenuItem[]>
+  • getMenuItem(id: string): Promise<MenuItem | undefined>
+
+3.4 API ROUTES (server/routes.ts)
+-----------------------------------
+The routes.ts file contains ALL API endpoints. Here are the ones relevant to orders:
+
+ORDER ENDPOINTS:
+  GET    /api/orders                    # Get all orders
+  GET    /api/orders/active             # Get active orders (kitchen uses this)
+  GET    /api/orders/completed          # Get completed orders
+  GET    /api/orders/:id                # Get single order
+  POST   /api/orders                    # Create new order ⭐ YOU WILL USE THIS
+  PATCH  /api/orders/:id                # Update order
+  PATCH  /api/orders/:id/status         # Update order status
+  DELETE /api/orders/:id                # Delete order
+
+ORDER ITEM ENDPOINTS:
+  GET    /api/orders/:orderId/items     # Get all items for an order
+  POST   /api/orders/:orderId/items     # Add item to order ⭐ YOU WILL USE THIS
+  PATCH  /api/order-items/:id           # Update order item
+  PATCH  /api/order-items/:id/status    # Update item status
+  DELETE /api/order-items/:id           # Delete order item
+
+SPECIAL ORDER ENDPOINTS:
+  POST   /api/orders/:id/kot            # Generate KOT (Kitchen Order Ticket)
+  POST   /api/orders/:id/checkout       # Checkout and create invoice
+  GET    /api/orders/:id/kot/pdf        # Download KOT as PDF
+  GET    /api/orders/:id/invoice/pdf    # Download invoice as PDF
+
+TABLE ENDPOINTS:
+  GET    /api/tables                    # Get all tables
+  GET    /api/tables/:id                # Get single table
+  PATCH  /api/tables/:id/status         # Update table status
+  PATCH  /api/tables/:id/order          # Link order to table
+
+MENU ENDPOINTS:
+  GET    /api/menu                      # Get all menu items ⭐ YOU WILL USE THIS
+  GET    /api/menu/categories           # Get category list
+  GET    /api/menu/:id                  # Get single menu item
+
+3.5 WEBSOCKET IMPLEMENTATION (server/routes.ts)
+-------------------------------------------------
+The WebSocket server broadcasts real-time updates:
+
+```typescript
+import { WebSocketServer, WebSocket } from 'ws';
+
+let wss: WebSocketServer;
+
+function broadcastUpdate(type: string, data: any) {
+  const message = JSON.stringify({ type, data });
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  });
+}
+
+// WebSocket server setup:
+wss = new WebSocketServer({ server: httpServer, path: "/api/ws" });
+```
+
+WebSocket Event Types (you MUST broadcast these):
+  • 'order_created'           - New order created
+  • 'order_updated'           - Order modified
+  • 'order_completed'         - Order completed
+  • 'order_paid'              - Order paid
+  • 'order_item_added'        - Item added to order
+  • 'order_item_updated'      - Item modified
+  • 'order_item_deleted'      - Item removed
+  • 'table_updated'           - Table status changed
+  • 'menu_updated'            - Menu item changed
+
+Example from existing code:
+```typescript
+app.post("/api/orders", async (req, res) => {
+  const result = insertOrderSchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({ error: result.error });
+  }
+  const order = await storage.createOrder(result.data);
+  broadcastUpdate("order_created", order);  // ⭐ THIS LINE IS CRITICAL
+  res.json(order);
+});
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION 4: FRONTEND ARCHITECTURE (client/src/)
+═══════════════════════════════════════════════════════════════════════════════
+
+4.1 FILE STRUCTURE
+-------------------
+client/src/
+  ├── pages/                    # All page components
+  │   ├── billing.tsx           # POS/Billing page (1200+ lines) ⭐ REFERENCE THIS
+  │   ├── kitchen.tsx           # Kitchen Display System
+  │   ├── tables.tsx            # Table management
+  │   ├── menu.tsx              # Menu management (admin)
+  │   ├── dashboard.tsx         # Analytics dashboard
+  │   ├── customers.tsx         # Customer management
+  │   ├── invoices.tsx          # Invoice history
+  │   └── ... (40+ other pages)
+  ├── components/               # Reusable components
+  │   ├── AppHeader.tsx         # Top navigation bar
+  │   ├── CategorySidebar.tsx   # Category filter (used in billing)
+  │   ├── MenuItemCard.tsx      # Menu item display card ⭐ REUSE THIS
+  │   ├── OrderCart.tsx         # Cart component ⭐ REUSE THIS
+  │   └── ui/                   # Shadcn UI components
+  ├── hooks/
+  │   ├── use-websocket.ts      # WebSocket hook ⭐ YOU MUST USE THIS
+  │   └── use-toast.ts          # Toast notifications
+  ├── lib/
+  │   └── queryClient.ts        # TanStack Query setup ⭐ CRITICAL
+  ├── App.tsx                   # Main app with routing
+  └── main.tsx                  # Entry point
+
+4.2 ROUTING (wouter)
+---------------------
+Routes are defined in client/src/App.tsx:
+
+```typescript
+import { Route, Switch } from "wouter";
+
+function App() {
+  return (
+    <Switch>
+      <Route path="/" component={Dashboard} />
+      <Route path="/billing" component={BillingPage} />
+      <Route path="/kitchen" component={KitchenPage} />
+      <Route path="/tables" component={TablesPage} />
+      <Route path="/menu" component={MenuPage} />
+      {/* Add your digital menu route here: */}
+      <Route path="/digital-menu" component={DigitalMenuPage} />
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+```
+
+Navigation uses wouter's Link component or useLocation hook:
+```typescript
+import { Link, useLocation } from "wouter";
+
+// Link:
+<Link href="/digital-menu?table=T1">View Menu</Link>
+
+// Programmatic navigation:
+const [, navigate] = useLocation();
+navigate("/digital-menu?table=T1");
+```
+
+4.3 DATA FETCHING (TanStack Query v5)
+---------------------------------------
+The system uses TanStack Query for ALL API calls.
+
+Setup (client/src/lib/queryClient.ts):
+```typescript
+import { QueryClient } from "@tanstack/react-query";
+
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      queryFn: async ({ queryKey }) => {
+        const res = await fetch(queryKey[0] as string);
+        if (!res.ok) throw new Error('Network response not ok');
+        return res.json();
+      },
+    },
+  },
+});
+
+export async function apiRequest(method: string, url: string, data?: any) {
+  const options: RequestInit = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (data) options.body = JSON.stringify(data);
+  return fetch(url, options);
+}
+```
+
+QUERY PATTERN (Read data):
+```typescript
+import { useQuery } from "@tanstack/react-query";
+import type { MenuItem, Order } from "@shared/schema";
+
+// Get all menu items:
+const { data: menuItems = [], isLoading } = useQuery<MenuItem[]>({
+  queryKey: ["/api/menu"],
+});
+
+// Get specific order:
+const { data: order } = useQuery<Order>({
+  queryKey: ["/api/orders", orderId],
+});
+```
+
+MUTATION PATTERN (Write data):
+```typescript
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+
+const createOrderMutation = useMutation({
+  mutationFn: async (data: { tableId: string; orderType: string }) => {
+    const res = await apiRequest("POST", "/api/orders", data);
+    return await res.json();
+  },
+  onSuccess: (order) => {
+    // Invalidate cache to refresh data:
+    queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tables"] });
+  },
+});
+
+// Usage:
+createOrderMutation.mutate({ tableId: "123", orderType: "dine-in" });
+```
+
+4.4 WEBSOCKET CLIENT (client/src/hooks/use-websocket.ts)
+----------------------------------------------------------
+The WebSocket hook automatically reconnects and invalidates queries:
+
+```typescript
+import { useWebSocket } from "@/hooks/use-websocket";
+
+// In your component:
+function DigitalMenuPage() {
+  useWebSocket(); // ⭐ CALL THIS IN YOUR COMPONENT
+  
+  // WebSocket will auto-invalidate queries when updates occur
+}
+```
+
+How it works:
+1. Connects to ws://hostname:5000/api/ws
+2. Listens for messages like: { type: "order_created", data: {...} }
+3. Automatically invalidates TanStack Query caches
+4. Components re-fetch data and update UI
+
+4.5 UI COMPONENTS (Shadcn + Tailwind)
+---------------------------------------
+The system uses Shadcn UI components. Import them with '@/' prefix:
+
+```typescript
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+```
+
+Icons from Lucide React:
+```typescript
+import { ShoppingCart, Plus, Minus, Trash2, Check, X } from "lucide-react";
+```
+
+4.6 EXISTING REUSABLE COMPONENTS
+----------------------------------
+These components ALREADY EXIST and can be reused:
+
+MenuItemCard (client/src/components/MenuItemCard.tsx):
+  • Displays menu item with image, name, price, veg/non-veg indicator
+  • Props: item (MenuItem), onAddToCart callback
+  • Already styled and responsive
+
+OrderCart (client/src/components/OrderCart.tsx):
+  • Shows cart items with quantity controls
+  • Props: items, onUpdateQuantity, onRemoveItem, onCheckout
+  • Calculates totals automatically
+
+CategorySidebar (client/src/components/CategorySidebar.tsx):
+  • Category filter with icons
+  • Props: categories, selectedCategory, onCategoryChange
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION 5: HOW CURRENT BILLING/POS WORKS (Reference Implementation)
+═══════════════════════════════════════════════════════════════════════════════
+
+Study client/src/pages/billing.tsx - this is the EXACT pattern you must follow.
+
+5.1 BILLING PAGE WORKFLOW
+---------------------------
+1. User selects table (or chooses delivery/pickup)
+2. User browses menu items by category
+3. User adds items to cart with quantity
+4. User can add special notes to items
+5. User clicks "Send to Kitchen" to create order and KOT
+6. Order saved to database with status "pending"
+7. WebSocket broadcasts to Kitchen Display
+8. Kitchen prepares items
+9. User clicks "Checkout" to generate invoice
+10. Payment processed, order marked as "paid"
+
+5.2 KEY CODE PATTERNS FROM BILLING.TSX
+----------------------------------------
+
+State Management:
+```typescript
+const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+const [currentTableId, setCurrentTableId] = useState<string | null>(null);
+const [serviceType, setServiceType] = useState<"dine-in" | "delivery" | "pickup">("dine-in");
+```
+
+Reading URL Parameters:
+```typescript
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const tableId = params.get("tableId");
+  const tableNumber = params.get("tableNumber");
+  const orderId = params.get("orderId");
+  
+  if (tableId && tableNumber) {
+    setCurrentTableId(tableId);
+    setTableNumber(tableNumber);
+  }
+  
+  if (orderId) {
+    setCurrentOrderId(orderId);
+    fetchExistingOrder(orderId);
+  }
+}, []);
+```
+
+Fetching Menu Items:
+```typescript
+const { data: menuItems = [], isLoading } = useQuery<MenuItem[]>({
+  queryKey: ["/api/menu"],
+});
+
+const { data: categoriesData } = useQuery<{ categories: string[] }>({
+  queryKey: ["/api/menu/categories"],
+});
+```
+
+Adding Items to Cart:
+```typescript
+const handleAddToCart = (item: MenuItem) => {
+  setOrderItems(prev => {
+    const existing = prev.find(oi => oi.menuItemId === item.id);
+    if (existing) {
+      return prev.map(oi =>
+        oi.menuItemId === item.id
+          ? { ...oi, quantity: oi.quantity + 1 }
+          : oi
+      );
+    }
+    return [...prev, {
+      id: crypto.randomUUID(),
+      menuItemId: item.id,
+      name: item.name,
+      price: parseFloat(item.price),
+      quantity: 1,
+      isVeg: item.isVeg,
+    }];
+  });
+};
+```
+
+Creating Order (Send to Kitchen):
+```typescript
+const createOrderMutation = useMutation({
+  mutationFn: async (data: { 
+    tableId: string | null; 
+    orderType: string;
+  }) => {
+    const res = await apiRequest("POST", "/api/orders", data);
+    return await res.json();
+  },
+  onSuccess: (order: Order) => {
+    setCurrentOrderId(order.id);
+    // Now add items to the order...
+    addItemsToOrder(order.id);
+  },
+});
+
+// Trigger order creation:
+createOrderMutation.mutate({
+  tableId: currentTableId,
+  orderType: serviceType,
+});
+```
+
+Adding Items to Order:
+```typescript
+const addOrderItemMutation = useMutation({
+  mutationFn: async (data: { orderId: string; item: any }) => {
+    const res = await apiRequest("POST", `/api/orders/${data.orderId}/items`, data.item);
+    return await res.json();
+  },
+});
+
+// Add each cart item:
+orderItems.forEach(item => {
+  addOrderItemMutation.mutate({
+    orderId: currentOrderId,
+    item: {
+      menuItemId: item.menuItemId,
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price.toString(),
+      notes: item.notes || null,
+      status: "new",
+      isVeg: item.isVeg,
+    },
+  });
+});
+```
+
+Generating KOT:
+```typescript
+const kotMutation = useMutation({
+  mutationFn: async (orderId: string) => {
+    const res = await apiRequest("POST", `/api/orders/${orderId}/kot`, { print: true });
+    return await res.json();
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
+    toast({ title: "KOT sent to kitchen!" });
+  },
+});
+
+kotMutation.mutate(currentOrderId);
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION 6: DIGITAL MENU - WHAT CURRENTLY EXISTS
+═══════════════════════════════════════════════════════════════════════════════
+
+Based on the provided screenshots, the Digital Menu page displays:
+
+CURRENT FEATURES:
+  ✅ Horizontal scrollable category carousel at top
+  ✅ Category images (New, Soups, Veg Starter, Chicken Starter, etc.)
+  ✅ Menu item cards in a grid layout
+  ✅ Each card shows:
+     - Item image
+     - Item name (e.g., "Veg Clear Soup", "Chicken 65")
+     - Description (e.g., "Light clear vegetable broth")
+     - Price (₹130, ₹250, etc.)
+     - Veg/Non-veg indicator (green/red dot)
+  ✅ Mobile-responsive design
+  ✅ Professional styling with shadows and hover effects
+
+MISSING FEATURES (Your job):
+  ❌ Cart functionality (no way to add items)
+  ❌ Quantity selector
+  ❌ Cart view/summary
+  ❌ Table number detection from QR code
+  ❌ Order placement capability
+  ❌ Integration with backend order system
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION 7: YOUR TASK - ADD CART & ORDERING TO DIGITAL MENU
+═══════════════════════════════════════════════════════════════════════════════
+
+7.1 QR CODE TABLE DETECTION
+-----------------------------
+When customers scan a QR code at their table, they will access:
+  URL: https://your-app.com/digital-menu?table=T1
+
+Your implementation must:
+  1. Extract table number from URL query parameter
+  2. Validate table exists in database (GET /api/tables)
+  3. Display table number prominently in header
+  4. Store table number in component state for order creation
+  5. Show error if table parameter is missing or invalid
+
+Example Implementation:
+```typescript
+function DigitalMenuPage() {
+  const [tableNumber, setTableNumber] = useState<string>("");
+  const [tableId, setTableId] = useState<string>("");
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tableParam = params.get("table");
+    
+    if (!tableParam) {
+      // Show error: "Please scan the QR code at your table"
+      return;
+    }
+    
+    setTableNumber(tableParam);
+    
+    // Validate table exists:
+    fetch(`/api/tables`)
+      .then(res => res.json())
+      .then(tables => {
+        const table = tables.find(t => t.tableNumber === tableParam);
+        if (table) {
+          setTableId(table.id);
+        } else {
+          // Show error: "Invalid table number"
+        }
+      });
+  }, []);
+  
+  return (
+    <div>
+      <header>
+        <h1>Digital Menu</h1>
+        <Badge>Table: {tableNumber}</Badge>
+      </header>
+      {/* ... rest of UI */}
+    </div>
+  );
+}
+```
+
+7.2 CART FUNCTIONALITY
+-----------------------
+Add cart state and item management:
+
+Cart State Structure:
+```typescript
+interface CartItem {
+  menuItemId: string;
+  name: string;
+  price: number;
+  quantity: number;
+  image: string | null;
+  isVeg: boolean;
+  specialInstructions?: string;
+}
+
+const [cartItems, setCartItems] = useState<CartItem[]>([]);
+```
+
+Add to Cart Function:
+```typescript
+const handleAddToCart = (item: MenuItem) => {
+  setCartItems(prev => {
+    const existing = prev.find(ci => ci.menuItemId === item.id);
+    if (existing) {
+      return prev.map(ci =>
+        ci.menuItemId === item.id
+          ? { ...ci, quantity: ci.quantity + 1 }
+          : ci
+      );
+    }
+    return [...prev, {
+      menuItemId: item.id,
+      name: item.name,
+      price: parseFloat(item.price),
+      quantity: 1,
+      image: item.image,
+      isVeg: item.isVeg,
+    }];
+  });
+};
+```
+
+Update Quantity:
+```typescript
+const handleUpdateQuantity = (menuItemId: string, newQuantity: number) => {
+  if (newQuantity === 0) {
+    setCartItems(prev => prev.filter(ci => ci.menuItemId !== menuItemId));
+  } else {
+    setCartItems(prev => prev.map(ci =>
+      ci.menuItemId === menuItemId
+        ? { ...ci, quantity: newQuantity }
+        : ci
+    ));
+  }
+};
+```
+
+Remove from Cart:
+```typescript
+const handleRemoveFromCart = (menuItemId: string) => {
+  setCartItems(prev => prev.filter(ci => ci.menuItemId !== menuItemId));
+};
+```
+
+Calculate Total:
+```typescript
+const cartTotal = cartItems.reduce(
+  (sum, item) => sum + (item.price * item.quantity), 
+  0
+);
+```
+
+7.3 CART UI COMPONENTS
+-----------------------
+Floating Cart Button (shows item count):
+```typescript
+<Button
+  className="fixed bottom-6 right-6 rounded-full h-16 w-16"
+  onClick={() => setShowCart(true)}
+  data-testid="button-view-cart"
+>
+  <ShoppingCart className="h-6 w-6" />
+  {cartItems.length > 0 && (
+    <Badge className="absolute -top-2 -right-2" data-testid="text-cart-count">
+      {cartItems.length}
+    </Badge>
+  )}
+</Button>
+```
+
+Cart Sheet/Modal (for viewing and editing cart):
+```typescript
+<Sheet open={showCart} onOpenChange={setShowCart}>
+  <SheetContent>
+    <SheetHeader>
+      <SheetTitle>Your Order</SheetTitle>
+    </SheetHeader>
+    
+    {cartItems.length === 0 ? (
+      <p>Your cart is empty</p>
+    ) : (
+      <>
+        {cartItems.map(item => (
+          <div key={item.menuItemId} className="flex items-center gap-4 py-3">
+            <img src={item.image} className="w-16 h-16 object-cover rounded" />
+            <div className="flex-1">
+              <h4>{item.name}</h4>
+              <p>₹{item.price}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => handleUpdateQuantity(item.menuItemId, item.quantity - 1)}
+                data-testid={`button-decrease-quantity-${item.menuItemId}`}
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <span data-testid={`text-quantity-${item.menuItemId}`}>
+                {item.quantity}
+              </span>
+              <Button
+                size="sm"
+                onClick={() => handleUpdateQuantity(item.menuItemId, item.quantity + 1)}
+                data-testid={`button-increase-quantity-${item.menuItemId}`}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleRemoveFromCart(item.menuItemId)}
+              data-testid={`button-remove-${item.menuItemId}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+        
+        <div className="border-t pt-4 mt-4">
+          <div className="flex justify-between text-lg font-bold">
+            <span>Total:</span>
+            <span data-testid="text-order-total">₹{cartTotal}</span>
+          </div>
+          
+          <Button
+            className="w-full mt-4"
+            onClick={handlePlaceOrder}
+            disabled={placeOrderMutation.isPending}
+            data-testid="button-place-order"
+          >
+            {placeOrderMutation.isPending ? "Placing..." : "Place Order"}
+          </Button>
+        </div>
+      </>
+    )}
+  </SheetContent>
+</Sheet>
+```
+
+7.4 ORDER PLACEMENT (CRITICAL IMPLEMENTATION)
+-----------------------------------------------
+This is the MOST IMPORTANT part. Follow this EXACT pattern:
+
+Step 1: Create the Order
+```typescript
+const placeOrderMutation = useMutation({
+  mutationFn: async () => {
+    // 1. Create order
+    const orderRes = await apiRequest("POST", "/api/orders", {
+      tableId: tableId,                    // From QR code
+      orderType: "dine-in",
+      status: "pending",
+      total: cartTotal.toString(),
+    });
+    const order = await orderRes.json();
+    
+    // 2. Add all items to order
+    for (const item of cartItems) {
+      await apiRequest("POST", `/api/orders/${order.id}/items`, {
+        menuItemId: item.menuItemId,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price.toString(),
+        notes: item.specialInstructions || null,
+        status: "new",
+        isVeg: item.isVeg,
+      });
+    }
+    
+    // 3. Generate KOT (Kitchen Order Ticket)
+    await apiRequest("POST", `/api/orders/${order.id}/kot`, { print: false });
+    
+    // 4. Update table status
+    await apiRequest("PATCH", `/api/tables/${tableId}/status`, {
+      status: "occupied"
+    });
+    
+    // 5. Link order to table
+    await apiRequest("PATCH", `/api/tables/${tableId}/order`, {
+      orderId: order.id
+    });
+    
+    return order;
+  },
+  onSuccess: (order) => {
+    // Invalidate caches (triggers WebSocket updates)
+    queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tables"] });
+    
+    // Clear cart
+    setCartItems([]);
+    
+    // Close cart
+    setShowCart(false);
+    
+    // Show success message
+    toast({
+      title: "Order Placed!",
+      description: `Your order #${order.id.slice(0, 8)} has been sent to the kitchen.`,
+    });
+  },
+  onError: (error) => {
+    toast({
+      title: "Order Failed",
+      description: "Please try again or call for assistance.",
+      variant: "destructive",
+    });
+  },
+});
+
+// Trigger order placement:
+const handlePlaceOrder = () => {
+  if (cartItems.length === 0) return;
+  if (!tableId) {
+    toast({
+      title: "Error",
+      description: "Table information missing. Please scan QR code again.",
+      variant: "destructive",
+    });
+    return;
+  }
+  
+  placeOrderMutation.mutate();
+};
+```
+
+7.5 WEBSOCKET INTEGRATION
+---------------------------
+CRITICAL: Call useWebSocket hook in your component:
+
+```typescript
+import { useWebSocket } from "@/hooks/use-websocket";
+
+function DigitalMenuPage() {
+  useWebSocket();  // ⭐ THIS IS MANDATORY
+  
+  // ... rest of component
+}
+```
+
+This ensures:
+  • Kitchen Display automatically updates when order is placed
+  • Table status updates in real-time
+  • POS system shows the new order
+
+7.6 DATA TESTID ATTRIBUTES
+----------------------------
+Add these test IDs to ALL interactive elements:
+
+Menu Items:
+  data-testid={`button-add-to-cart-${item.id}`}
+
+Cart:
+  data-testid="button-view-cart"
+  data-testid="text-cart-count"
+  data-testid={`button-increase-quantity-${item.menuItemId}`}
+  data-testid={`button-decrease-quantity-${item.menuItemId}`}
+  data-testid={`button-remove-${item.menuItemId}`}
+  data-testid={`text-quantity-${item.menuItemId}`}
+  data-testid="text-order-total"
+  data-testid="button-place-order"
+
+Table Info:
+  data-testid="text-table-number"
+
+7.7 SPECIAL INSTRUCTIONS (OPTIONAL BUT RECOMMENDED)
+-----------------------------------------------------
+Allow customers to add notes to items:
+
+```typescript
+const [editingItemNotes, setEditingItemNotes] = useState<string | null>(null);
+
+// In cart view:
+{editingItemNotes === item.menuItemId ? (
+  <Input
+    placeholder="Special instructions (e.g., Extra spicy, No onions)"
+    value={item.specialInstructions || ""}
+    onChange={(e) => handleUpdateItemNotes(item.menuItemId, e.target.value)}
+    data-testid={`input-notes-${item.menuItemId}`}
+  />
+) : (
+  <Button
+    variant="link"
+    onClick={() => setEditingItemNotes(item.menuItemId)}
+    data-testid={`button-add-notes-${item.menuItemId}`}
+  >
+    Add special instructions
+  </Button>
+)}
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION 8: COMPLETE IMPLEMENTATION CHECKLIST
+═══════════════════════════════════════════════════════════════════════════════
+
+BEFORE YOU START:
+  ☐ Read this ENTIRE document
+  ☐ Examine client/src/pages/billing.tsx (1200+ lines of reference code)
+  ☐ Examine shared/schema.ts (understand all data types)
+  ☐ Examine server/routes.ts (see all available API endpoints)
+
+FILE CREATION:
+  ☐ Create client/src/pages/digital-menu.tsx (or edit existing file)
+  ☐ Add route in client/src/App.tsx:
+      <Route path="/digital-menu" component={DigitalMenuPage} />
+
+IMPORTS NEEDED:
+  ☐ useState, useEffect from "react"
+  ☐ useQuery, useMutation from "@tanstack/react-query"
+  ☐ useWebSocket from "@/hooks/use-websocket"
+  ☐ useToast from "@/hooks/use-toast"
+  ☐ apiRequest, queryClient from "@/lib/queryClient"
+  ☐ MenuItem type from "@shared/schema"
+  ☐ Icons from "lucide-react": ShoppingCart, Plus, Minus, Trash2
+  ☐ UI components: Button, Badge, Card, Sheet, Input, etc.
+
+IMPLEMENTATION STEPS:
+  ☐ Extract table number from URL (?table=T1)
+  ☐ Validate table exists in database
+  ☐ Display table number in header
+  ☐ Fetch menu items (GET /api/menu)
+  ☐ Display menu items by category (reuse existing UI)
+  ☐ Add "Add to Cart" button to each menu item card
+  ☐ Implement cart state (useState<CartItem[]>)
+  ☐ Implement handleAddToCart function
+  ☐ Implement handleUpdateQuantity function
+  ☐ Implement handleRemoveFromCart function
+  ☐ Calculate cart total
+  ☐ Create floating cart button with item count badge
+  ☐ Create cart Sheet/Modal for viewing cart
+  ☐ Display cart items with quantity controls
+  ☐ Add special instructions input (optional)
+  ☐ Create placeOrderMutation
+  ☐ Implement handlePlaceOrder function following EXACT pattern in Section 7.4
+  ☐ Call useWebSocket() hook
+  ☐ Add all data-testid attributes
+  ☐ Show loading states (isLoading, isPending)
+  ☐ Add error handling
+  ☐ Show success toast after order placement
+  ☐ Clear cart after successful order
+
+TESTING:
+  ☐ Navigate to /digital-menu?table=T1
+  ☐ Verify table number displays correctly
+  ☐ Verify menu items load and display
+  ☐ Add items to cart
+  ☐ Verify cart count updates
+  ☐ Open cart view
+  ☐ Modify quantities
+  ☐ Remove items
+  ☐ Verify total calculation
+  ☐ Place order
+  ☐ Verify order appears in Kitchen Display (/kitchen)
+  ☐ Verify table status updates in Tables page (/tables)
+  ☐ Verify order exists in backend (GET /api/orders/active)
+  ☐ Check browser console for WebSocket messages
+  ☐ Test error cases (no table param, invalid table, empty cart)
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION 9: COMMON PITFALLS & TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════════
+
+PROBLEM: Order doesn't appear in Kitchen Display
+SOLUTION: 
+  • Make sure you called POST /api/orders/:id/kot
+  • Verify WebSocket is connected (check console logs)
+  • Ensure useWebSocket() hook is called in component
+  • Check that Kitchen Display page is open and connected
+
+PROBLEM: Cart doesn't update after adding items
+SOLUTION:
+  • Verify setState is called correctly
+  • Check React DevTools for state changes
+  • Ensure handleAddToCart function returns new array (immutable update)
+
+PROBLEM: "Table not found" error
+SOLUTION:
+  • Verify table exists: GET /api/tables
+  • Check URL query parameter is correct (?table=T1)
+  • Ensure table number matches database exactly (case-sensitive)
+
+PROBLEM: Order creation fails with validation error
+SOLUTION:
+  • Verify request body matches insertOrderSchema exactly
+  • Check that orderType is "dine-in", "delivery", or "pickup"
+  • Ensure tableId is a valid string or null
+  • Check price is string, not number: "130" not 130
+
+PROBLEM: WebSocket not broadcasting updates
+SOLUTION:
+  • Check server logs for broadcastUpdate calls
+  • Verify WebSocketServer is initialized
+  • Ensure broadcastUpdate is called AFTER database save
+  • Check ws library is installed
+
+PROBLEM: TanStack Query not refetching data
+SOLUTION:
+  • Verify queryClient.invalidateQueries is called
+  • Check queryKey matches exactly
+  • Use predicate for complex query key matching
+  • Ensure query keys are arrays, not strings
+
+PROBLEM: TypeScript errors on schema types
+SOLUTION:
+  • Import types from "@shared/schema", not "shared/schema"
+  • Ensure tsconfig paths are correct
+  • Check that type exactly matches schema interface
+  • Verify nullable fields use | null, not | undefined
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION 10: OPTIONAL ENHANCEMENTS
+═══════════════════════════════════════════════════════════════════════════════
+
+After core functionality works, consider adding:
+
+ORDER STATUS TRACKING:
+  • Show "Your order is being prepared" message
+  • Poll order status every 30 seconds
+  • Notify when order is ready
+  • Allow customer to call waiter (send notification)
+
+ORDER HISTORY:
+  • Show previous orders for this table
+  • Allow re-ordering from history
+  • Display order timestamps
+
+MENU ENHANCEMENTS:
+  • Search functionality
+  • Filter by veg/non-veg
+  • Show popular items badge
+  • Display item ratings/reviews
+  • Dietary information (gluten-free, vegan, etc.)
+
+UX IMPROVEMENTS:
+  • Add item with smooth animation
+  • Cart slide-in animation
+  • Skeleton loaders while data fetches
+  • Optimistic UI updates
+  • Offline support with service worker
+
+CUSTOMIZATION:
+  • Multi-language support (English, Hindi, etc.)
+  • Dark mode toggle
+  • Customize item (size, toppings, etc.)
+  • Split bill request
+  • Tip calculation
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION 11: REFERENCE CODE SNIPPETS
+═══════════════════════════════════════════════════════════════════════════════
+
+COMPLETE DIGITAL MENU PAGE SKELETON:
+
+```typescript
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { ShoppingCart, Plus, Minus, Trash2 } from "lucide-react";
+import { useWebSocket } from "@/hooks/use-websocket";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import type { MenuItem } from "@shared/schema";
+
+interface CartItem {
+  menuItemId: string;
+  name: string;
+  price: number;
+  quantity: number;
+  image: string | null;
+  isVeg: boolean;
+  specialInstructions?: string;
+}
+
+export default function DigitalMenuPage() {
+  useWebSocket();
+  const { toast } = useToast();
+  
+  const [tableNumber, setTableNumber] = useState<string>("");
+  const [tableId, setTableId] = useState<string>("");
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [showCart, setShowCart] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  
+  // Extract table from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tableParam = params.get("table");
+    
+    if (!tableParam) {
+      toast({
+        title: "Error",
+        description: "Please scan the QR code at your table",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setTableNumber(tableParam);
+    
+    // Validate table exists
+    fetch("/api/tables")
+      .then(res => res.json())
+      .then(tables => {
+        const table = tables.find(t => t.tableNumber === tableParam);
+        if (table) {
+          setTableId(table.id);
+        } else {
+          toast({
+            title: "Error",
+            description: "Invalid table number",
+            variant: "destructive",
+          });
+        }
+      });
+  }, []);
+  
+  // Fetch menu items
+  const { data: menuItems = [], isLoading } = useQuery<MenuItem[]>({
+    queryKey: ["/api/menu"],
+  });
+  
+  // Filter by category
+  const filteredItems = selectedCategory === "all"
+    ? menuItems
+    : menuItems.filter(item => item.category === selectedCategory);
+  
+  // Cart functions
+  const handleAddToCart = (item: MenuItem) => {
+    setCartItems(prev => {
+      const existing = prev.find(ci => ci.menuItemId === item.id);
+      if (existing) {
+        return prev.map(ci =>
+          ci.menuItemId === item.id
+            ? { ...ci, quantity: ci.quantity + 1 }
+            : ci
+        );
+      }
+      return [...prev, {
+        menuItemId: item.id,
+        name: item.name,
+        price: parseFloat(item.price),
+        quantity: 1,
+        image: item.image,
+        isVeg: item.isVeg,
+      }];
+    });
+    
+    toast({
+      title: "Added to cart",
+      description: `${item.name} added to your order`,
+    });
+  };
+  
+  const handleUpdateQuantity = (menuItemId: string, newQuantity: number) => {
+    if (newQuantity === 0) {
+      setCartItems(prev => prev.filter(ci => ci.menuItemId !== menuItemId));
+    } else {
+      setCartItems(prev => prev.map(ci =>
+        ci.menuItemId === menuItemId
+          ? { ...ci, quantity: newQuantity }
+          : ci
+      ));
+    }
+  };
+  
+  const handleRemoveFromCart = (menuItemId: string) => {
+    setCartItems(prev => prev.filter(ci => ci.menuItemId !== menuItemId));
+  };
+  
+  const cartTotal = cartItems.reduce(
+    (sum, item) => sum + (item.price * item.quantity),
+    0
+  );
+  
+  // Place order mutation
+  const placeOrderMutation = useMutation({
+    mutationFn: async () => {
+      // Create order
+      const orderRes = await apiRequest("POST", "/api/orders", {
+        tableId: tableId,
+        orderType: "dine-in",
+        status: "pending",
+        total: cartTotal.toString(),
+      });
+      const order = await orderRes.json();
+      
+      // Add items
+      for (const item of cartItems) {
+        await apiRequest("POST", `/api/orders/${order.id}/items`, {
+          menuItemId: item.menuItemId,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price.toString(),
+          notes: item.specialInstructions || null,
+          status: "new",
+          isVeg: item.isVeg,
+        });
+      }
+      
+      // Generate KOT
+      await apiRequest("POST", `/api/orders/${order.id}/kot`, { print: false });
+      
+      // Update table
+      await apiRequest("PATCH", `/api/tables/${tableId}/status`, {
+        status: "occupied"
+      });
+      await apiRequest("PATCH", `/api/tables/${tableId}/order`, {
+        orderId: order.id
+      });
+      
+      return order;
+    },
+    onSuccess: (order) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tables"] });
+      
+      setCartItems([]);
+      setShowCart(false);
+      
+      toast({
+        title: "Order Placed!",
+        description: "Your order has been sent to the kitchen.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Order Failed",
+        description: "Please try again or call for assistance.",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const handlePlaceOrder = () => {
+    if (cartItems.length === 0) return;
+    if (!tableId) {
+      toast({
+        title: "Error",
+        description: "Table information missing",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    placeOrderMutation.mutate();
+  };
+  
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-background border-b p-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Ming's Menu</h1>
+          <Badge variant="outline" data-testid="text-table-number">
+            Table: {tableNumber}
+          </Badge>
+        </div>
+      </header>
+      
+      {/* Category Carousel */}
+      <div className="overflow-x-auto p-4">
+        {/* Category buttons here */}
+      </div>
+      
+      {/* Menu Items Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+        {filteredItems.map(item => (
+          <div key={item.id} className="border rounded-lg p-4">
+            {item.image && (
+              <img src={item.image} className="w-full h-48 object-cover rounded" />
+            )}
+            <h3 className="font-bold mt-2">{item.name}</h3>
+            <p className="text-sm text-muted-foreground">{item.description}</p>
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-lg font-bold">₹{item.price}</span>
+              <Badge variant={item.isVeg ? "default" : "destructive"}>
+                {item.isVeg ? "Veg" : "Non-Veg"}
+              </Badge>
+            </div>
+            <Button
+              className="w-full mt-2"
+              onClick={() => handleAddToCart(item)}
+              data-testid={`button-add-to-cart-${item.id}`}
+            >
+              Add to Cart
+            </Button>
+          </div>
+        ))}
+      </div>
+      
+      {/* Floating Cart Button */}
+      <Button
+        className="fixed bottom-6 right-6 rounded-full h-16 w-16"
+        onClick={() => setShowCart(true)}
+        data-testid="button-view-cart"
+      >
+        <ShoppingCart className="h-6 w-6" />
+        {cartItems.length > 0 && (
+          <Badge className="absolute -top-2 -right-2" data-testid="text-cart-count">
+            {cartItems.length}
+          </Badge>
+        )}
+      </Button>
+      
+      {/* Cart Sheet */}
+      <Sheet open={showCart} onOpenChange={setShowCart}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Your Order</SheetTitle>
+          </SheetHeader>
+          
+          {cartItems.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">
+              Your cart is empty
+            </p>
+          ) : (
+            <>
+              <div className="space-y-4 py-4">
+                {cartItems.map(item => (
+                  <div key={item.menuItemId} className="flex items-center gap-4">
+                    {item.image && (
+                      <img src={item.image} className="w-16 h-16 object-cover rounded" />
+                    )}
+                    <div className="flex-1">
+                      <h4 className="font-medium">{item.name}</h4>
+                      <p className="text-sm text-muted-foreground">₹{item.price}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleUpdateQuantity(item.menuItemId, item.quantity - 1)}
+                        data-testid={`button-decrease-quantity-${item.menuItemId}`}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <span data-testid={`text-quantity-${item.menuItemId}`}>
+                        {item.quantity}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleUpdateQuantity(item.menuItemId, item.quantity + 1)}
+                        data-testid={`button-increase-quantity-${item.menuItemId}`}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveFromCart(item.menuItemId)}
+                      data-testid={`button-remove-${item.menuItemId}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="border-t pt-4">
+                <div className="flex justify-between text-lg font-bold mb-4">
+                  <span>Total:</span>
+                  <span data-testid="text-order-total">₹{cartTotal}</span>
+                </div>
+                
+                <Button
+                  className="w-full"
+                  onClick={handlePlaceOrder}
+                  disabled={placeOrderMutation.isPending}
+                  data-testid="button-place-order"
+                >
+                  {placeOrderMutation.isPending ? "Placing Order..." : "Place Order"}
+                </Button>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+SECTION 12: FINAL REMINDERS
+═══════════════════════════════════════════════════════════════════════════════
+
+CRITICAL POINTS:
+  1. DO NOT create new order schema - use existing from shared/schema.ts
+  2. DO NOT create new API endpoints - use existing from server/routes.ts
+  3. DO call useWebSocket() hook - it's mandatory for real-time updates
+  4. DO follow billing.tsx patterns - it's your reference implementation
+  5. DO invalidate query cache after mutations - keeps UI in sync
+  6. DO add data-testid to ALL interactive elements
+  7. DO handle loading and error states
+  8. DO clear cart after successful order
+  9. DO show toast notifications for user feedback
+  10. DO test integration with Kitchen Display and Tables pages
+
+MONGODB REQUIREMENT:
+  • MONGODB_URI secret must be set in Replit environment
+  • All data persists to MongoDB
+  • No in-memory storage
+
+SUCCESS CRITERIA:
+  ✓ Customer scans QR code → Digital Menu opens with table number
+  ✓ Customer adds items to cart
+  ✓ Cart updates in real-time with correct totals
+  ✓ Customer places order
+  ✓ Order appears in Kitchen Display immediately
+  ✓ Table status updates to "occupied"
+  ✓ Order saved to MongoDB
+  ✓ Staff can process order through existing POS system
+
+═══════════════════════════════════════════════════════════════════════════════
+END OF DOCUMENT
+═══════════════════════════════════════════════════════════════════════════════
+
+Total Sections: 12
+Total Length: 1000+ lines
+Purpose: Complete self-contained guide for implementing Digital Menu cart and
+         ordering functionality in existing Restaurant POS system.
+
+USAGE INSTRUCTIONS:
+1. Copy this ENTIRE file content
+2. Paste into Replit Agent chat
+3. Agent will have complete context to implement feature
+4. No additional questions needed - everything is documented
+
+Good luck with your implementation! 🚀
