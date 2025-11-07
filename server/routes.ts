@@ -907,7 +907,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/clear-data", async (req, res) => {
     try {
-      const { types } = req.body;
+      const { types = ['all'] } = req.body;
       const cleared: string[] = [];
 
       if (types.includes('orderItems') || types.includes('all')) {
