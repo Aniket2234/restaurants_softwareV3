@@ -50,6 +50,10 @@ interface OrderCartProps {
   selectedTableFromDropdown?: string;
   onFloorChange?: (floorId: string) => void;
   onTableChange?: (tableId: string) => void;
+  checkoutMode?: boolean;
+  onCancelCheckout?: () => void;
+  onPaymentMethodSelect?: (method: "cash" | "upi" | "card") => void;
+  paymentMethod?: "cash" | "upi" | "card";
 }
 
 export default function OrderCart({
@@ -73,11 +77,15 @@ export default function OrderCart({
   selectedTableFromDropdown = "",
   onFloorChange,
   onTableChange,
+  checkoutMode = false,
+  onCancelCheckout,
+  onPaymentMethodSelect,
+  paymentMethod: externalPaymentMethod = "cash",
 }: OrderCartProps) {
   const [notesDialogItem, setNotesDialogItem] = useState<OrderItem | null>(null);
   const [tempNotes, setTempNotes] = useState("");
   const [customNote, setCustomNote] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "upi" | "card">("cash");
+  const paymentMethod = externalPaymentMethod;
   
   const predefinedNotes = [
     "Make it Spicy",
@@ -311,95 +319,115 @@ export default function OrderCart({
         </div>
         
         <div className="mb-3">
-          <p className="text-xs text-gray-600 mb-2 font-medium">Payment Method</p>
+          <p className="text-xs text-gray-600 mb-2 font-medium">
+            {checkoutMode ? "Select Payment Method to Complete" : "Payment Method"}
+          </p>
           <div className="grid grid-cols-3 gap-2">
             <Button
               size="default"
               variant={paymentMethod === "cash" ? "default" : "outline"}
-              onClick={() => setPaymentMethod("cash")}
+              onClick={() => onPaymentMethodSelect?.("cash")}
               className="text-sm"
+              data-testid="button-payment-cash"
             >
               Cash
             </Button>
             <Button
               size="default"
               variant={paymentMethod === "upi" ? "default" : "outline"}
-              onClick={() => setPaymentMethod("upi")}
+              onClick={() => onPaymentMethodSelect?.("upi")}
               className="text-sm"
+              data-testid="button-payment-upi"
             >
               UPI
             </Button>
             <Button
               size="default"
               variant={paymentMethod === "card" ? "default" : "outline"}
-              onClick={() => setPaymentMethod("card")}
+              onClick={() => onPaymentMethodSelect?.("card")}
               className="text-sm"
+              data-testid="button-payment-card"
             >
               Card
             </Button>
           </div>
         </div>
         
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          {onKOT && (
+        {!checkoutMode && (
+          <>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              {onKOT && (
+                <Button
+                  variant="outline"
+                  className="border border-primary text-primary hover:bg-primary hover:text-white text-sm"
+                  disabled={items.length === 0}
+                  onClick={onKOT}
+                  data-testid="button-kot"
+                >
+                  <Send className="h-4 w-4 mr-1" />
+                  KOT
+                </Button>
+              )}
+              {onKOTPrint && (
+                <Button
+                  variant="outline"
+                  className="border border-primary text-primary hover:bg-primary hover:text-white text-sm"
+                  disabled={items.length === 0}
+                  onClick={onKOTPrint}
+                  data-testid="button-kot-print"
+                >
+                  <Send className="h-4 w-4 mr-1" />
+                  KOT & Print
+                </Button>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              {onSave && (
+                <Button
+                  variant="outline"
+                  className="text-sm"
+                  disabled={items.length === 0}
+                  onClick={onSave}
+                  data-testid="button-save"
+                >
+                  Save
+                </Button>
+              )}
+              {onSavePrint && (
+                <Button
+                  variant="outline"
+                  className="text-sm"
+                  disabled={items.length === 0}
+                  onClick={onSavePrint}
+                  data-testid="button-save-print"
+                >
+                  Save & Print
+                </Button>
+              )}
+            </div>
+            
             <Button
-              variant="outline"
-              className="border border-primary text-primary hover:bg-primary hover:text-white text-sm"
+              className="w-full text-sm"
               disabled={items.length === 0}
-              onClick={onKOT}
-              data-testid="button-kot"
+              onClick={onCheckout}
+              data-testid="button-checkout"
             >
-              <Send className="h-4 w-4 mr-1" />
-              KOT
+              Checkout
             </Button>
-          )}
-          {onKOTPrint && (
-            <Button
-              variant="outline"
-              className="border border-primary text-primary hover:bg-primary hover:text-white text-sm"
-              disabled={items.length === 0}
-              onClick={onKOTPrint}
-              data-testid="button-kot-print"
-            >
-              <Send className="h-4 w-4 mr-1" />
-              KOT & Print
-            </Button>
-          )}
-        </div>
+          </>
+        )}
         
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          {onSave && (
-            <Button
-              variant="outline"
-              className="text-sm"
-              disabled={items.length === 0}
-              onClick={onSave}
-              data-testid="button-save"
-            >
-              Save
-            </Button>
-          )}
-          {onSavePrint && (
-            <Button
-              variant="outline"
-              className="text-sm"
-              disabled={items.length === 0}
-              onClick={onSavePrint}
-              data-testid="button-save-print"
-            >
-              Save & Print
-            </Button>
-          )}
-        </div>
-        
-        <Button
-          className="w-full text-sm"
-          disabled={items.length === 0}
-          onClick={onCheckout}
-          data-testid="button-checkout"
-        >
-          Checkout
-        </Button>
+        {checkoutMode && (
+          <Button
+            variant="outline"
+            className="w-full text-sm"
+            onClick={onCancelCheckout}
+            data-testid="button-cancel-checkout"
+          >
+            Cancel Checkout
+          </Button>
+        )}
       </div>
 
       <Dialog open={!!notesDialogItem} onOpenChange={() => setNotesDialogItem(null)}>

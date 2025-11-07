@@ -39,6 +39,7 @@ export default function BillingPage() {
   const [serviceType, setServiceType] = useState<"dine-in" | "delivery" | "pickup">("dine-in");
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [checkoutMode, setCheckoutMode] = useState(false);
   const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
   const [showSplitBillDialog, setShowSplitBillDialog] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "upi">("cash");
@@ -540,7 +541,111 @@ export default function BillingPage() {
       });
       return;
     }
-    setShowCheckoutDialog(true);
+    setCheckoutMode(true);
+  };
+
+  const handleCancelCheckout = () => {
+    setCheckoutMode(false);
+  };
+
+  const handlePaymentMethodSelect = async (method: "cash" | "card" | "upi") => {
+    if (!checkoutMode) {
+      setPaymentMethod(method);
+      return;
+    }
+
+    const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const tax = subtotal * 0.05;
+    const total = subtotal + tax;
+
+    try {
+      let orderId = currentOrderId;
+      
+      if (!orderId && pendingKotAction !== "none") {
+        orderId = await createOrderWithItems();
+      }
+
+      if (!orderId) {
+        toast({
+          title: "No active order",
+          description: "Please send KOT or save order first before checkout",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const checkoutResponse = await checkoutMutation.mutateAsync({ 
+        orderId: orderId, 
+        paymentMode: method,
+        splitPayments: undefined,
+        print: false 
+      });
+
+      if (pendingKotAction !== "none") {
+        const shouldPrint = pendingKotAction === "kot-print";
+        
+        if (shouldPrint && checkoutResponse.invoice) {
+          try {
+            const pdfUrl = `/api/invoices/${checkoutResponse.invoice.id}/pdf`;
+            const response = await fetch(pdfUrl);
+            if (!response.ok) throw new Error('Failed to download invoice');
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${checkoutResponse.invoice.invoiceNumber}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+          } catch (error) {
+            console.error('Failed to download invoice PDF:', error);
+            toast({
+              title: "Warning",
+              description: "Invoice PDF download failed, but order was completed successfully",
+              variant: "destructive",
+            });
+          }
+        }
+        
+        await billMutation.mutateAsync({ orderId: orderId!, print: false });
+        
+        await kotMutation.mutateAsync({ orderId: orderId!, print: false });
+        
+        toast({
+          title: "Order completed!",
+          description: shouldPrint ? "Invoice downloaded successfully" : "Order marked as completed",
+        });
+        
+        setPendingKotAction("none");
+      }
+
+      setCheckoutMode(false);
+      setOrderItems([]);
+      setCurrentOrderId(null);
+      setCurrentTableId(null);
+      setTableNumber("");
+      setFloorName("");
+      setSelectedCustomer(null);
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tables"] });
+      
+      toast({
+        title: "Payment successful",
+        description: `Payment of ₹${total.toFixed(2)} via ${method.toUpperCase()} completed`,
+      });
+      
+      navigate("/");
+    } catch (error: any) {
+      console.error("Checkout failed:", error);
+      toast({
+        title: "Checkout failed",
+        description: error.message || "Failed to process payment",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSplitBill = () => {
@@ -822,6 +927,10 @@ export default function BillingPage() {
             selectedTableFromDropdown={selectedTableFromDropdown}
             onFloorChange={handleFloorChange}
             onTableChange={handleTableChange}
+            checkoutMode={checkoutMode}
+            onCancelCheckout={handleCancelCheckout}
+            onPaymentMethodSelect={handlePaymentMethodSelect}
+            paymentMethod={paymentMethod}
           />
         </div>
       </div>
