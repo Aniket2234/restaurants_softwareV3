@@ -334,6 +334,12 @@ export class MongoStorage implements IStorage {
     return result ?? undefined;
   }
 
+  async deleteOrder(id: string): Promise<boolean> {
+    await this.ensureConnection();
+    const result = await mongodb.getCollection<Order>('orders').deleteOne({ id } as any);
+    return result.deletedCount > 0;
+  }
+
   async getOrderItems(orderId: string): Promise<OrderItem[]> {
     await this.ensureConnection();
     const items = await mongodb.getCollection<OrderItem>('orderItems').find({ orderId } as any).toArray();

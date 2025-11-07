@@ -61,6 +61,7 @@ export interface IStorage {
   completeOrder(id: string): Promise<Order | undefined>;
   billOrder(id: string): Promise<Order | undefined>;
   checkoutOrder(id: string, paymentMode?: string): Promise<Order | undefined>;
+  deleteOrder(id: string): Promise<boolean>;
 
   getOrderItems(orderId: string): Promise<OrderItem[]>;
   getOrderItem(id: string): Promise<OrderItem | undefined>;
@@ -450,6 +451,10 @@ export class MemStorage implements IStorage {
     };
     this.orders.set(id, updated);
     return updated;
+  }
+
+  async deleteOrder(id: string): Promise<boolean> {
+    return this.orders.delete(id);
   }
 
   async getOrderItems(orderId: string): Promise<OrderItem[]> {

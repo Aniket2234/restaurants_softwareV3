@@ -929,6 +929,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cleared.push('invoices');
       }
 
+      if (types.includes('orders') || types.includes('all')) {
+        const orders = await storage.getOrders();
+        for (const order of orders) {
+          await storage.deleteOrder(order.id);
+        }
+        cleared.push('orders');
+      }
+
       broadcastUpdate("data_cleared", { types: cleared });
       res.json({ success: true, cleared });
     } catch (error) {
