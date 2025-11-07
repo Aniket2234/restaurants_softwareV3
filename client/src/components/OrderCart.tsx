@@ -54,6 +54,7 @@ interface OrderCartProps {
   checkoutMode?: boolean;
   onCancelCheckout?: () => void;
   onPaymentMethodSelect?: (method: "cash" | "upi" | "card") => void;
+  onConfirmPayment?: () => void;
   paymentMethod?: "cash" | "upi" | "card";
 }
 
@@ -82,6 +83,7 @@ export default function OrderCart({
   checkoutMode = false,
   onCancelCheckout,
   onPaymentMethodSelect,
+  onConfirmPayment,
   paymentMethod: externalPaymentMethod = "cash",
 }: OrderCartProps) {
   const [notesDialogItem, setNotesDialogItem] = useState<OrderItem | null>(null);
@@ -422,6 +424,15 @@ export default function OrderCart({
         
         {checkoutMode && (
           <div className="space-y-2">
+            {onConfirmPayment && (
+              <Button
+                className="w-full text-sm"
+                onClick={onConfirmPayment}
+                data-testid="button-confirm-payment"
+              >
+                Confirm Payment
+              </Button>
+            )}
             {onSplitBill && (
               <Button
                 variant="outline"

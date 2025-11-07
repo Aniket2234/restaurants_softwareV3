@@ -369,3 +369,13 @@
 [x] 369. Split Bill button styled with primary border and hover effects
 [x] 370. Successfully restarted application with Split Bill in checkout mode
 [x] 371. ✅ CHECKOUT MODE ENHANCED: Now includes Split Bill option along with payment methods and cancel button
+[x] 372. Separated payment method selection from payment confirmation (November 07, 2025)
+[x] 373. Modified handlePaymentMethodSelect to only set payment method without completing payment
+[x] 374. Created handleConfirmPayment handler to process payment when Confirm button is clicked
+[x] 375. Added onConfirmPayment prop to OrderCart component interface
+[x] 376. Added "Confirm Payment" button in checkout mode (appears first before Split Bill)
+[x] 377. Passed handleConfirmPayment handler from billing.tsx to OrderCart component
+[x] 378. Payment buttons (Cash, UPI, Card) now only select payment method in checkout mode
+[x] 379. User must click "Confirm Payment" button to complete the transaction
+[x] 380. Successfully restarted application with two-step checkout process
+[x] 381. ✅ TWO-STEP CHECKOUT COMPLETE: Select payment method → Click Confirm Payment button to complete

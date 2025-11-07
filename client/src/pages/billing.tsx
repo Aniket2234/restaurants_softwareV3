@@ -548,12 +548,11 @@ export default function BillingPage() {
     setCheckoutMode(false);
   };
 
-  const handlePaymentMethodSelect = async (method: "cash" | "card" | "upi") => {
-    if (!checkoutMode) {
-      setPaymentMethod(method);
-      return;
-    }
+  const handlePaymentMethodSelect = (method: "cash" | "card" | "upi") => {
+    setPaymentMethod(method);
+  };
 
+  const handleConfirmPayment = async () => {
     const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const tax = subtotal * 0.05;
     const total = subtotal + tax;
@@ -576,7 +575,7 @@ export default function BillingPage() {
 
       const checkoutResponse = await checkoutMutation.mutateAsync({ 
         orderId: orderId, 
-        paymentMode: method,
+        paymentMode: paymentMethod,
         splitPayments: undefined,
         print: false 
       });
@@ -634,7 +633,7 @@ export default function BillingPage() {
       
       toast({
         title: "Payment successful",
-        description: `Payment of ₹${total.toFixed(2)} via ${method.toUpperCase()} completed`,
+        description: `Payment of ₹${total.toFixed(2)} via ${paymentMethod.toUpperCase()} completed`,
       });
       
       navigate("/");
@@ -931,6 +930,7 @@ export default function BillingPage() {
             checkoutMode={checkoutMode}
             onCancelCheckout={handleCancelCheckout}
             onPaymentMethodSelect={handlePaymentMethodSelect}
+            onConfirmPayment={handleConfirmPayment}
             paymentMethod={paymentMethod}
           />
         </div>
