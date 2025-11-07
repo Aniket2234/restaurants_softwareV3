@@ -113,7 +113,7 @@ export default function KitchenPage() {
 
   const { currentKOT, servedKOT, completedKOT } = useMemo(() => {
     const current = ordersWithDetails.filter(({ items }) => 
-      !items.every(item => item.status === "ready" || item.status === "served")
+      !items.every(item => item.status === "served")
     );
     const served = ordersWithDetails.filter(({ items }) => 
       items.every(item => item.status === "served")
