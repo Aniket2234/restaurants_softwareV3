@@ -518,3 +518,13 @@
 [x] 518. Successfully tested - dropdown menu works correctly, tabs switch properly
 [x] 519. Screenshot confirmed clean header layout with space-saving hamburger menu
 [x] 520. ✅ KITCHEN DISPLAY SPACE OPTIMIZATION COMPLETE: Header now uses significantly less space while maintaining full functionality
+[x] 521. WEBSOCKET ERROR FIX: Resolved persistent Vite HMR WebSocket console error (November 07, 2025)
+[x] 522. Root cause identified: Forcing Vite HMR to use Express server caused fallback to invalid localhost:undefined URL
+[x] 523. Called architect tool for expert debugging guidance on WebSocket configuration issue
+[x] 524. Removed explicit HMR configuration from server/vite.ts (no hmr: { server } or hmr: false)
+[x] 525. Reverted vite.config.ts to clean state (removed all HMR settings)
+[x] 526. Allowed Vite to use its default HMR configuration in middleware mode
+[x] 527. Successfully restarted application - Vite HMR now connects without errors
+[x] 528. Verified browser console shows "[vite] connected." with no WebSocket errors
+[x] 529. Both Vite HMR WebSocket and application WebSocket (/api/ws) now working perfectly
+[x] 530. ✅ WEBSOCKET ERROR RESOLVED: Clean browser console, HMR working, no more localhost:undefined errors
