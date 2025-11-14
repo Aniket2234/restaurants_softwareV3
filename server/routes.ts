@@ -1112,6 +1112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const digitalMenuSync = new DigitalMenuSyncService(storage);
+  digitalMenuSync.setBroadcastFunction(broadcastUpdate);
   
   app.post("/api/digital-menu/sync-start", async (req, res) => {
     try {

@@ -1,15 +1,22 @@
 import { mongodb } from './mongodb';
 import { type DigitalMenuOrder, type DigitalMenuCustomer } from '@shared/schema';
 import { type IStorage } from './storage';
+import { ObjectId } from 'mongodb';
 
 export class DigitalMenuSyncService {
   private storage: IStorage;
   private syncInterval: NodeJS.Timeout | null = null;
   private processedOrderIds: Set<string> = new Set();
+  private orderStatusMap: Map<string, string> = new Map();
   private isRunning = false;
+  private broadcastFn: ((type: string, data: any) => void) | null = null;
 
   constructor(storage: IStorage) {
     this.storage = storage;
+  }
+
+  setBroadcastFunction(fn: (type: string, data: any) => void) {
+    this.broadcastFn = fn;
   }
 
   async start(intervalMs: number = 5000): Promise<void> {
@@ -21,6 +28,9 @@ export class DigitalMenuSyncService {
     this.isRunning = true;
     console.log('🔄 Starting digital menu sync service...');
     
+    // Load existing sync state from MongoDB
+    await this.loadSyncState();
+    
     await this.syncOrders();
     
     this.syncInterval = setInterval(async () => {
@@ -28,6 +38,25 @@ export class DigitalMenuSyncService {
     }, intervalMs);
 
     console.log(`✅ Digital menu sync service started (polling every ${intervalMs / 1000}s)`);
+  }
+
+  private async loadSyncState(): Promise<void> {
+    try {
+      await mongodb.connect();
+      const collection = mongodb.getCollection<DigitalMenuOrder>('digital_menu_customer_orders');
+      
+      const syncedOrders = await collection.find({ syncedToPOS: true }).toArray();
+      
+      for (const order of syncedOrders) {
+        const orderId = order._id.toString();
+        this.processedOrderIds.add(orderId);
+        this.orderStatusMap.set(orderId, order.status);
+      }
+      
+      console.log(`📊 Loaded ${syncedOrders.length} synced orders from MongoDB`);
+    } catch (error) {
+      console.error('❌ Error loading sync state:', error);
+    }
   }
 
   stop(): void {
@@ -44,6 +73,7 @@ export class DigitalMenuSyncService {
       await mongodb.connect();
       const collection = mongodb.getCollection<DigitalMenuOrder>('digital_menu_customer_orders');
       
+      // Sync new orders
       const unprocessedOrders = await collection.find({
         status: { $in: ['pending', 'confirmed'] },
         syncedToPOS: { $ne: true }
@@ -58,18 +88,63 @@ export class DigitalMenuSyncService {
         try {
           await this.convertAndCreatePOSOrder(digitalOrder);
           this.processedOrderIds.add(orderId);
+          this.orderStatusMap.set(orderId, digitalOrder.status);
           synced++;
           console.log(`✅ Synced digital menu order ${orderId} for ${digitalOrder.customerName}`);
+          
+          if (this.broadcastFn) {
+            this.broadcastFn('digital_menu_order_synced', { 
+              orderId, 
+              customerName: digitalOrder.customerName,
+              status: digitalOrder.status 
+            });
+          }
         } catch (error) {
           console.error(`❌ Failed to sync order ${orderId}:`, error);
         }
       }
 
-      if (synced > 0) {
-        console.log(`📊 Synced ${synced} new digital menu order(s)`);
+      // Check for status updates in existing orders
+      const syncedOrders = await collection.find({
+        syncedToPOS: true
+      }).toArray();
+
+      let updated = 0;
+      for (const digitalOrder of syncedOrders) {
+        const orderId = digitalOrder._id.toString();
+        const previousStatus = this.orderStatusMap.get(orderId);
+        
+        if (previousStatus && previousStatus !== digitalOrder.status) {
+          try {
+            await this.updatePOSOrderStatus(digitalOrder);
+            this.orderStatusMap.set(orderId, digitalOrder.status);
+            updated++;
+            console.log(`🔄 Updated digital menu order ${orderId} status: ${previousStatus} → ${digitalOrder.status}`);
+            
+            if (this.broadcastFn) {
+              this.broadcastFn('digital_menu_order_updated', { 
+                orderId, 
+                customerName: digitalOrder.customerName,
+                previousStatus,
+                newStatus: digitalOrder.status 
+              });
+            }
+          } catch (error) {
+            console.error(`❌ Failed to update order ${orderId} status:`, error);
+          }
+        } else if (!previousStatus) {
+          this.orderStatusMap.set(orderId, digitalOrder.status);
+        }
       }
 
-      return synced;
+      if (synced > 0 || updated > 0) {
+        console.log(`📊 Digital menu sync: ${synced} new, ${updated} updated`);
+        if (this.broadcastFn) {
+          this.broadcastFn('digital_menu_synced', { newOrders: synced, updatedOrders: updated });
+        }
+      }
+
+      return synced + updated;
     } catch (error) {
       console.error('❌ Error during digital menu sync:', error);
       return 0;
@@ -121,7 +196,7 @@ export class DigitalMenuSyncService {
 
     let calculatedSubtotal = 0;
 
-    for (const item of digitalOrder.items) {
+    for (const item of digitalOrder.items || []) {
       const menuItem = await this.findMenuItemByName(item.menuItemName);
       
       const notes = [
@@ -129,8 +204,8 @@ export class DigitalMenuSyncService {
         item.spiceLevel ? `Spice: ${item.spiceLevel}` : null
       ].filter(Boolean).join(' | ') || null;
 
-      const itemPrice = item.price.toFixed(2);
-      calculatedSubtotal += item.price * item.quantity;
+      const itemPrice = (item.price || 0).toFixed(2);
+      calculatedSubtotal += (item.price || 0) * (item.quantity || 0);
 
       await this.storage.createOrderItem({
         orderId: posOrder.id,
@@ -144,8 +219,8 @@ export class DigitalMenuSyncService {
       });
     }
 
-    const orderTotal = digitalOrder.total.toFixed(2);
-    const calculatedTotal = (calculatedSubtotal + digitalOrder.tax).toFixed(2);
+    const orderTotal = (digitalOrder.total || 0).toFixed(2);
+    const calculatedTotal = (calculatedSubtotal + (digitalOrder.tax || 0)).toFixed(2);
     
     if (Math.abs(parseFloat(orderTotal) - parseFloat(calculatedTotal)) > 0.01) {
       console.warn(`⚠️  Order total mismatch for ${digitalOrder.customerName}: Digital Menu=${orderTotal}, Calculated=${calculatedTotal}`);
@@ -153,7 +228,7 @@ export class DigitalMenuSyncService {
 
     await this.storage.updateOrderTotal(posOrder.id, orderTotal);
 
-    await this.markOrderAsSynced(digitalOrder._id);
+    await this.markOrderAsSynced(digitalOrder._id, posOrder.id);
   }
 
   private async findTableByNumberAndFloor(tableNumber: string, floorNumber?: string): Promise<any | undefined> {
@@ -187,20 +262,66 @@ export class DigitalMenuSyncService {
     return matchingTables[0];
   }
 
-  private async markOrderAsSynced(orderId: string): Promise<void> {
+  private async updatePOSOrderStatus(digitalOrder: any): Promise<void> {
+    try {
+      // Get the stored POS order ID from the digital menu order
+      if (!digitalOrder.posOrderId) {
+        console.warn(`⚠️  No POS order ID linked to digital menu order ${digitalOrder._id}`);
+        return;
+      }
+
+      // Fetch the POS order
+      const posOrder = await this.storage.getOrder(digitalOrder.posOrderId);
+      if (!posOrder) {
+        console.warn(`⚠️  POS order ${digitalOrder.posOrderId} not found`);
+        return;
+      }
+
+      // Map digital menu status to POS order item status
+      const statusMapping: Record<string, string> = {
+        'pending': 'new',
+        'confirmed': 'new',
+        'preparing': 'preparing',
+        'completed': 'served',
+        'cancelled': 'served' // Mark as served to remove from active
+      };
+
+      const newItemStatus = statusMapping[digitalOrder.status] || 'new';
+
+      // Update all order items for this order
+      const orderItems = await this.storage.getOrderItems(posOrder.id);
+      for (const item of orderItems) {
+        if (item.status !== newItemStatus) {
+          await this.storage.updateOrderItemStatus(item.id, newItemStatus as any);
+        }
+      }
+
+      console.log(`✅ Updated POS order ${posOrder.id} items to status: ${newItemStatus} (from digital menu status: ${digitalOrder.status})`);
+    } catch (error) {
+      console.error(`❌ Failed to update POS order status:`, error);
+    }
+  }
+
+  private async markOrderAsSynced(orderId: string, posOrderId: string): Promise<void> {
     try {
       await mongodb.connect();
       const collection = mongodb.getCollection('digital_menu_customer_orders');
       
-      await collection.updateOne(
-        { _id: orderId as any },
+      // Convert string ID to ObjectId for proper MongoDB matching
+      const result = await collection.updateOne(
+        { _id: new ObjectId(orderId) },
         { 
           $set: { 
             syncedToPOS: true,
-            syncedAt: new Date()
+            syncedAt: new Date(),
+            posOrderId: posOrderId
           } 
         }
       );
+
+      if (result.modifiedCount === 0) {
+        console.warn(`⚠️  Failed to mark order ${orderId} as synced - no document matched`);
+      }
     } catch (error) {
       console.error(`❌ Failed to mark order ${orderId} as synced:`, error);
     }

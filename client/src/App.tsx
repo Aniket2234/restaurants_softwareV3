@@ -57,6 +57,7 @@ import EmailTemplatesPage from "@/pages/email-templates";
 import MarketingPage from "@/pages/marketing";
 import IntegrationsPage from "@/pages/integrations";
 import DatabasePage from "@/pages/database";
+import DigitalMenuOrdersPage from "@/pages/digital-menu-orders";
 
 function Router() {
   return (
@@ -110,6 +111,7 @@ function Router() {
       <Route path="/marketing" component={MarketingPage} />
       <Route path="/integrations" component={IntegrationsPage} />
       <Route path="/database" component={DatabasePage} />
+      <Route path="/digital-menu-orders" component={DigitalMenuOrdersPage} />
       <Route component={NotFound} />
     </Switch>
   );

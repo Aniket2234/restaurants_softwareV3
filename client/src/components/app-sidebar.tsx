@@ -17,6 +17,7 @@ import {
   Building2,
   Truck,
   Globe,
+  Smartphone,
 } from "lucide-react";
 import {
   Sidebar,
@@ -54,6 +55,7 @@ const menuGroups = [
     items: [
       { title: "Delivery", url: "/delivery", icon: Truck },
       { title: "Online Orders", url: "/online-orders", icon: Globe },
+      { title: "Digital Menu Orders", url: "/digital-menu-orders", icon: Smartphone },
       { title: "Reservations", url: "/reservations", icon: Calendar },
       { title: "Waiting List", url: "/waiting-list", icon: FileText },
       { title: "Events", url: "/events", icon: Calendar },
