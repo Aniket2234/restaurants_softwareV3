@@ -87,6 +87,20 @@ Preferred communication style: Simple, everyday language.
 - Single-window application principle - no page reloads
 - Material Design principles for data-heavy enterprise UI
 
+### Integrations
+
+**Digital Menu Integration** (November 14, 2025):
+- Automatic sync service that polls MongoDB `digital_menu_customer_orders` collection every 5 seconds
+- Converts digital menu orders to POS orders in real-time
+- Uses both tableNumber and floorNumber for accurate table matching
+- Validates order totals (calculates from items and compares with digital menu total)
+- Maps payment status ('paid' → 'billed', else 'active')
+- Persists sync status in MongoDB (adds `syncedToPOS: true` and `syncedAt` timestamp)
+- Prevents duplicate processing across server restarts
+- API endpoints for status monitoring and manual sync triggers
+- Preserves item-level data (spice level, notes) in POS order items
+- Auto-updates table status to 'occupied' when digital menu order is synced
+
 ### Recent Changes (November 2025)
 
 **Complete MongoDB Migration** (November 6, 2025):
