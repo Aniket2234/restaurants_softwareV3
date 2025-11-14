@@ -670,6 +670,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
 
+    // Sync table status to digital menu customer if this is a digital menu order
+    if (order && order.customerPhone) {
+      await digitalMenuSync.syncTableStatusFromPOSOrder(item.orderId);
+    }
+
     broadcastUpdate("order_item_updated", item);
     res.json(item);
   });

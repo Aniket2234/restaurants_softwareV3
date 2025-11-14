@@ -287,6 +287,11 @@ export class DigitalMenuSyncService {
 
     await this.storage.updateOrderTotal(posOrder.id, orderTotal);
 
+    // Update customer's initial table status to "occupied" when order is first created
+    if (digitalOrder.customerPhone) {
+      await this.updateCustomerTableStatus(digitalOrder.customerPhone, 'occupied');
+    }
+
     // Note: Order is now marked as synced in the calling function (syncOrders)
   }
 
@@ -391,6 +396,64 @@ export class DigitalMenuSyncService {
     return menuItems.find(item => 
       item.name.toLowerCase() === name.toLowerCase()
     );
+  }
+
+  async updateCustomerTableStatus(customerPhone: string, tableStatus: string): Promise<void> {
+    try {
+      await mongodb.connect();
+      const collection = mongodb.getCollection('customers');
+      
+      const result = await collection.updateOne(
+        { phoneNumber: customerPhone },
+        { 
+          $set: { 
+            tableStatus: tableStatus,
+            updatedAt: new Date()
+          } 
+        }
+      );
+
+      if (result.modifiedCount > 0) {
+        console.log(`✅ Updated customer ${customerPhone} tableStatus to: ${tableStatus}`);
+      }
+    } catch (error) {
+      console.error(`❌ Failed to update customer tableStatus:`, error);
+    }
+  }
+
+  async syncTableStatusFromPOSOrder(posOrderId: string): Promise<void> {
+    try {
+      // Get the POS order
+      const posOrder = await this.storage.getOrder(posOrderId);
+      if (!posOrder || !posOrder.customerPhone) {
+        return;
+      }
+
+      // Get all order items for this order
+      const orderItems = await this.storage.getOrderItems(posOrderId);
+      if (orderItems.length === 0) {
+        return;
+      }
+
+      // Determine the overall table status based on order item statuses
+      const allServed = orderItems.every(item => item.status === 'served');
+      const anyReady = orderItems.some(item => item.status === 'ready');
+      const anyPreparing = orderItems.some(item => item.status === 'preparing');
+      
+      let tableStatus = 'occupied';
+      if (allServed) {
+        tableStatus = 'served';
+      } else if (anyReady && !anyPreparing && orderItems.every(item => item.status === 'ready' || item.status === 'served')) {
+        tableStatus = 'ready';
+      } else if (anyPreparing || anyReady) {
+        tableStatus = 'preparing';
+      }
+
+      // Update customer's tableStatus in MongoDB
+      await this.updateCustomerTableStatus(posOrder.customerPhone, tableStatus);
+    } catch (error) {
+      console.error(`❌ Failed to sync table status from POS order:`, error);
+    }
   }
 
   async getDigitalMenuOrders(): Promise<DigitalMenuOrder[]> {

@@ -9,6 +9,13 @@
     [x] - Successfully synced digital menu orders to POS system
     [x] - Table T1 now shows as OCCUPIED when digital menu order is placed
     [x] - KOT now appears in Kitchen Display with customer info and items ✅
+[x] 6. CUSTOMER TABLE STATUS SYNC (Nov 14, 2025):
+    [x] - Added updateCustomerTableStatus() method to sync service
+    [x] - Added syncTableStatusFromPOSOrder() to calculate status from order items
+    [x] - Integrated customer status sync into routes.ts after POS table updates
+    [x] - Customer tableStatus now updates in real-time: occupied → preparing → ready → served
+    [x] - Verified full lifecycle: MongoDB customer tableStatus mirrors POS order status
+    [x] - Digital menu customers collection stays synchronized with POS system ✅
 [x] 5. Implemented complete reservation system with table management
 [x] 6. Added Reservation button in header
 [x] 7. Created reservation dialog with all required fields
