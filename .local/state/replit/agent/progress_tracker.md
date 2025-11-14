@@ -2,6 +2,13 @@
 [x] 2. Restart the workflow to see if the project is working ✅
 [x] 3. Verify the project is working using the feedback tool ✅
 [x] 4. Inform user the import is completed and they can start building, mark the import as completed using the complete_project_import tool ✅
+[x] 5. DIGITAL MENU SYNC FIX (Nov 14, 2025):
+    [x] - Diagnosed nested order structure in digital_menu_customer_orders collection
+    [x] - Updated sync service to iterate through nested orders array
+    [x] - Fixed status mapping: "active" → "sent_to_kitchen" for Kitchen Display visibility
+    [x] - Successfully synced digital menu orders to POS system
+    [x] - Table T1 now shows as OCCUPIED when digital menu order is placed
+    [x] - KOT now appears in Kitchen Display with customer info and items ✅
 [x] 5. Implemented complete reservation system with table management
 [x] 6. Added Reservation button in header
 [x] 7. Created reservation dialog with all required fields
