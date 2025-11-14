@@ -262,3 +262,47 @@ export const insertFeedbackSchema = z.object({
 });
 
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
+
+// Digital Menu Order types
+export interface DigitalMenuOrderItem {
+  menuItemId: string;
+  menuItemName: string;
+  quantity: number;
+  price: number;
+  total: number;
+  spiceLevel?: string;
+  notes?: string;
+}
+
+export interface DigitalMenuOrder {
+  _id: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  items: DigitalMenuOrderItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  status: string;
+  paymentStatus: string;
+  paymentMethod?: string;
+  tableNumber?: string;
+  floorNumber?: string;
+  orderDate: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DigitalMenuCustomer {
+  _id: string;
+  name: string;
+  phoneNumber: string;
+  visitCount: number;
+  firstVisit: Date;
+  lastVisit: Date;
+  loginStatus: string;
+  tableNumber?: string;
+  floorNumber?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
