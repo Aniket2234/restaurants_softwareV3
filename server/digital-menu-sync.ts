@@ -46,18 +46,22 @@ export class DigitalMenuSyncService {
       
       const unprocessedOrders = await collection.find({
         status: { $in: ['pending', 'confirmed'] },
-        _id: { $nin: Array.from(this.processedOrderIds) }
+        syncedToPOS: { $ne: true }
       }).toArray();
 
       let synced = 0;
       for (const digitalOrder of unprocessedOrders) {
+        const orderId = digitalOrder._id.toString();
+        
+        if (this.processedOrderIds.has(orderId)) continue;
+        
         try {
           await this.convertAndCreatePOSOrder(digitalOrder);
-          this.processedOrderIds.add(digitalOrder._id.toString());
+          this.processedOrderIds.add(orderId);
           synced++;
-          console.log(`✅ Synced digital menu order ${digitalOrder._id} for ${digitalOrder.customerName}`);
+          console.log(`✅ Synced digital menu order ${orderId} for ${digitalOrder.customerName}`);
         } catch (error) {
-          console.error(`❌ Failed to sync order ${digitalOrder._id}:`, error);
+          console.error(`❌ Failed to sync order ${orderId}:`, error);
         }
       }
 
@@ -75,8 +79,12 @@ export class DigitalMenuSyncService {
   private async convertAndCreatePOSOrder(digitalOrder: DigitalMenuOrder): Promise<void> {
     let tableId: string | null = null;
 
-    if (digitalOrder.tableNumber && digitalOrder.floorNumber) {
-      const table = await this.storage.getTableByNumber(digitalOrder.tableNumber);
+    if (digitalOrder.tableNumber) {
+      const table = await this.findTableByNumberAndFloor(
+        digitalOrder.tableNumber,
+        digitalOrder.floorNumber
+      );
+      
       if (table) {
         tableId = table.id;
         
@@ -84,15 +92,20 @@ export class DigitalMenuSyncService {
           await this.storage.updateTableStatus(table.id, 'occupied');
         }
       } else {
-        console.warn(`⚠️  Table ${digitalOrder.tableNumber} not found in POS system`);
+        const locationInfo = digitalOrder.floorNumber 
+          ? `${digitalOrder.tableNumber} on floor ${digitalOrder.floorNumber}`
+          : digitalOrder.tableNumber;
+        console.warn(`⚠️  Table ${locationInfo} not found in POS system`);
       }
     }
+
+    const orderStatus = digitalOrder.paymentStatus === 'paid' ? 'billed' : 'active';
 
     const posOrder = await this.storage.createOrder({
       tableId: tableId,
       orderType: 'dine-in',
-      status: 'active',
-      total: digitalOrder.total.toFixed(2),
+      status: orderStatus,
+      total: '0',
       customerName: digitalOrder.customerName,
       customerPhone: digitalOrder.customerPhone,
       customerAddress: null,
@@ -106,6 +119,8 @@ export class DigitalMenuSyncService {
       await this.storage.updateTableOrder(tableId, posOrder.id);
     }
 
+    let calculatedSubtotal = 0;
+
     for (const item of digitalOrder.items) {
       const menuItem = await this.findMenuItemByName(item.menuItemName);
       
@@ -114,19 +129,81 @@ export class DigitalMenuSyncService {
         item.spiceLevel ? `Spice: ${item.spiceLevel}` : null
       ].filter(Boolean).join(' | ') || null;
 
+      const itemPrice = item.price.toFixed(2);
+      calculatedSubtotal += item.price * item.quantity;
+
       await this.storage.createOrderItem({
         orderId: posOrder.id,
         menuItemId: menuItem?.id || 'unknown',
         name: item.menuItemName,
         quantity: item.quantity,
-        price: item.price.toFixed(2),
+        price: itemPrice,
         notes: notes,
         status: 'new',
         isVeg: menuItem?.isVeg ?? true,
       });
     }
 
-    await this.storage.updateOrderTotal(posOrder.id, digitalOrder.total.toFixed(2));
+    const orderTotal = digitalOrder.total.toFixed(2);
+    const calculatedTotal = (calculatedSubtotal + digitalOrder.tax).toFixed(2);
+    
+    if (Math.abs(parseFloat(orderTotal) - parseFloat(calculatedTotal)) > 0.01) {
+      console.warn(`⚠️  Order total mismatch for ${digitalOrder.customerName}: Digital Menu=${orderTotal}, Calculated=${calculatedTotal}`);
+    }
+
+    await this.storage.updateOrderTotal(posOrder.id, orderTotal);
+
+    await this.markOrderAsSynced(digitalOrder._id);
+  }
+
+  private async findTableByNumberAndFloor(tableNumber: string, floorNumber?: string): Promise<any | undefined> {
+    const tables = await this.storage.getTables();
+    
+    if (floorNumber) {
+      const floors = await this.storage.getFloors();
+      const floor = floors.find(f => 
+        f.name.toLowerCase() === floorNumber.toLowerCase()
+      );
+      
+      if (floor) {
+        const matchingTable = tables.find(t => 
+          t.tableNumber === tableNumber && t.floorId === floor.id
+        );
+        
+        if (matchingTable) {
+          return matchingTable;
+        }
+      }
+      
+      console.warn(`⚠️  Floor "${floorNumber}" not found, searching all floors for table ${tableNumber}`);
+    }
+    
+    const matchingTables = tables.filter(t => t.tableNumber === tableNumber);
+    
+    if (matchingTables.length > 1) {
+      console.warn(`⚠️  Multiple tables with number "${tableNumber}" found on different floors. Using first match.`);
+    }
+    
+    return matchingTables[0];
+  }
+
+  private async markOrderAsSynced(orderId: string): Promise<void> {
+    try {
+      await mongodb.connect();
+      const collection = mongodb.getCollection('digital_menu_customer_orders');
+      
+      await collection.updateOne(
+        { _id: orderId as any },
+        { 
+          $set: { 
+            syncedToPOS: true,
+            syncedAt: new Date()
+          } 
+        }
+      );
+    } catch (error) {
+      console.error(`❌ Failed to mark order ${orderId} as synced:`, error);
+    }
   }
 
   private async findMenuItemByName(name: string): Promise<any | undefined> {
