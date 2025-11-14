@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueries } from "@tanstack/react-query";
 import AppHeader from "@/components/AppHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, Check, History, PlayCircle, ChevronDown, ChevronUp, Menu } from "lucide-react";
+import { Clock, Check, History, PlayCircle, ChevronDown, ChevronUp, Menu, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Order, OrderItem as DBOrderItem, Table } from "@shared/schema";
@@ -619,6 +619,15 @@ function KitchenOrderCard({
               {order.orderType && order.orderType !== "dine-in" && (
                 <Badge className="bg-white/20 text-white border-white/30 text-xs">
                   {order.orderType === "delivery" ? "DELIVERY" : "PICKUP"}
+                </Badge>
+              )}
+              {order.customerPhone && order.orderType === "dine-in" && (
+                <Badge 
+                  className="bg-primary text-primary-foreground border-primary/30 text-xs font-semibold flex items-center gap-1"
+                  data-testid={`badge-digital-menu-${orderId}`}
+                >
+                  <Smartphone className="h-3 w-3" />
+                  DIGITAL MENU
                 </Badge>
               )}
             </div>
