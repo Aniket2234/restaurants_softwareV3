@@ -18,6 +18,7 @@ import { z } from "zod";
 import { fetchMenuItemsFromMongoDB } from "./mongodbService";
 import { generateInvoicePDF } from "./utils/invoiceGenerator";
 import { generateKOTPDF } from "./utils/kotGenerator";
+import { DigitalMenuSyncService } from "./digital-menu-sync";
 
 const orderActionSchema = z.object({
   print: z.boolean().optional().default(false),
@@ -1109,6 +1110,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+
+  const digitalMenuSync = new DigitalMenuSyncService(storage);
+  
+  app.post("/api/digital-menu/sync-start", async (req, res) => {
+    try {
+      const intervalMs = req.body.intervalMs || 5000;
+      await digitalMenuSync.start(intervalMs);
+      res.json({ success: true, message: "Digital menu sync service started" });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to start sync service" });
+    }
+  });
+
+  app.post("/api/digital-menu/sync-stop", async (req, res) => {
+    try {
+      digitalMenuSync.stop();
+      res.json({ success: true, message: "Digital menu sync service stopped" });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to stop sync service" });
+    }
+  });
+
+  app.post("/api/digital-menu/sync-now", async (req, res) => {
+    try {
+      const synced = await digitalMenuSync.syncOrders();
+      broadcastUpdate("digital_menu_synced", { count: synced });
+      res.json({ success: true, syncedOrders: synced });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to sync orders" });
+    }
+  });
+
+  app.get("/api/digital-menu/status", async (req, res) => {
+    try {
+      const status = digitalMenuSync.getSyncStatus();
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get sync status" });
+    }
+  });
+
+  app.get("/api/digital-menu/orders", async (req, res) => {
+    try {
+      const orders = await digitalMenuSync.getDigitalMenuOrders();
+      res.json(orders);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch digital menu orders" });
+    }
+  });
+
+  app.get("/api/digital-menu/customers", async (req, res) => {
+    try {
+      const customers = await digitalMenuSync.getDigitalMenuCustomers();
+      res.json(customers);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch digital menu customers" });
+    }
+  });
+
+  digitalMenuSync.start(5000);
 
   const httpServer = createServer(app);
 
